@@ -1,0 +1,1041 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Romberger — Balance Analysis</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,400;0,500;0,700;1,400&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg: #f5f3ef;
+      --surface: #ffffff;
+      --text: #1a1a1a;
+      --text-muted: #6b6560;
+      --accent: #2d5a3d;
+      --accent-light: #e8f0eb;
+      --border: #e0dbd5;
+      --radius: 14px;
+      --shadow: 0 2px 20px rgba(0,0,0,0.04);
+      --open-color: #2980b9;
+      --open-bg: rgba(41,128,185,.08);
+      --closed-color: #c0392b;
+      --closed-bg: rgba(192,57,43,.08);
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ---- NAV ---- */
+    nav {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 1.25rem 2.5rem; border-bottom: 1px solid var(--border);
+      background: var(--surface); position: sticky; top: 0; z-index: 100;
+    }
+    .logo { font-family: 'Instrument Serif', serif; font-size: 1.55rem; letter-spacing: -0.02em; color: var(--accent); }
+    .logo span { font-style: italic; opacity: .55; font-weight: 400; }
+    .nav-links { display: flex; gap: 2rem; }
+    .nav-links a { text-decoration: none; color: var(--text-muted); font-size: 0.9rem; font-weight: 500; transition: color .2s; }
+    .nav-links a:hover { color: var(--accent); }
+
+    /* ---- SECTIONS ---- */
+    section { max-width: 960px; margin: 0 auto; padding: 4rem 2rem; }
+    section + section { border-top: 1px solid var(--border); }
+
+    /* ---- HERO ---- */
+    .hero { text-align: center; padding: 5rem 2rem 3.5rem; }
+    .hero h1 {
+      font-family: 'Instrument Serif', serif;
+      font-size: clamp(2.2rem, 5vw, 3.4rem);
+      font-weight: 400; line-height: 1.15; letter-spacing: -0.025em; margin-bottom: 1.25rem;
+    }
+    .hero p { color: var(--text-muted); font-size: 1.02rem; max-width: 560px; margin: 0 auto 2rem; line-height: 1.6; }
+    .btn-primary {
+      display: inline-block; background: var(--accent); color: #fff;
+      padding: .8rem 2rem; border-radius: 99px; text-decoration: none;
+      font-weight: 600; font-size: .92rem; border: none; cursor: pointer;
+      transition: transform .15s, box-shadow .2s;
+    }
+    .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 16px rgba(45,90,61,.25); }
+    .btn-primary:disabled { opacity: .45; pointer-events: none; }
+
+    /* ---- SECTION HEADINGS ---- */
+    .section-label { text-transform: uppercase; font-size: .72rem; letter-spacing: .12em; color: var(--accent); font-weight: 700; margin-bottom: .6rem; }
+    .section-title { font-family: 'Instrument Serif', serif; font-size: 1.75rem; font-weight: 400; margin-bottom: .6rem; }
+    .section-desc { color: var(--text-muted); font-size: .95rem; line-height: 1.6; max-width: 600px; }
+
+    /* ---- DUAL UPLOAD ---- */
+    .upload-pair {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-top: 1.5rem;
+    }
+    @media (max-width: 640px) { .upload-pair { grid-template-columns: 1fr; } }
+
+    .upload-zone {
+      background: var(--surface); border: 2px dashed var(--border); border-radius: var(--radius);
+      padding: 2rem 1.5rem; text-align: center; cursor: pointer;
+      transition: border-color .25s, background .25s, transform .15s;
+      position: relative;
+    }
+    .upload-zone:hover, .upload-zone.drag-over { border-color: var(--accent); background: var(--accent-light); }
+    .upload-zone.drag-over { transform: scale(1.01); }
+    .upload-zone.loaded { border-style: solid; }
+    .upload-zone.loaded.type-open { border-color: var(--open-color); background: rgba(41,128,185,.05); }
+    .upload-zone.loaded.type-closed { border-color: var(--closed-color); background: rgba(192,57,43,.05); }
+
+    .zone-badge {
+      display: inline-flex; align-items: center; gap: .4rem;
+      padding: .3rem .9rem; border-radius: 99px; font-size: .72rem; font-weight: 700;
+      text-transform: uppercase; letter-spacing: .06em; margin-bottom: 1rem;
+    }
+    .badge-open { background: rgba(41,128,185,.12); color: var(--open-color); }
+    .badge-closed { background: rgba(192,57,43,.12); color: var(--closed-color); }
+    .zone-badge .dot { width: 7px; height: 7px; border-radius: 50%; }
+    .badge-open .dot { background: var(--open-color); }
+    .badge-closed .dot { background: var(--closed-color); }
+
+    .zone-icon {
+      width: 44px; height: 44px; margin: 0 auto .8rem; border-radius: 50%;
+      background: var(--accent-light); display: flex; align-items: center; justify-content: center;
+    }
+    .zone-icon svg { stroke: var(--accent); width: 20px; height: 20px; }
+    .upload-zone h3 { font-size: 1rem; margin-bottom: .3rem; }
+    .upload-zone p { color: var(--text-muted); font-size: .82rem; line-height: 1.4; }
+
+    .zone-file-info {
+      display: none; margin-top: .8rem; padding: .6rem .8rem;
+      background: var(--bg); border-radius: 8px; font-size: .78rem;
+      text-align: left;
+    }
+    .zone-file-info.visible { display: block; }
+    .zone-file-name { font-weight: 600; }
+    .zone-file-meta { color: var(--text-muted); font-size: .72rem; margin-top: .15rem; }
+    .zone-remove {
+      position: absolute; top: .75rem; right: .75rem;
+      width: 26px; height: 26px; border-radius: 50%; border: 1px solid var(--border);
+      background: var(--surface); cursor: pointer; display: none;
+      align-items: center; justify-content: center; font-size: .65rem; color: var(--text-muted);
+      transition: background .15s, color .15s;
+    }
+    .zone-remove:hover { background: #f5dada; color: #c0392b; border-color: #e0a0a0; }
+    .upload-zone.loaded .zone-remove { display: flex; }
+
+    /* trim info */
+    .trim-notice {
+      margin-top: 1rem; padding: .7rem 1rem; border-radius: 10px;
+      background: rgba(45,90,61,.06); border: 1px solid rgba(45,90,61,.12);
+      font-size: .8rem; color: var(--accent); display: flex; align-items: center; gap: .5rem;
+    }
+    .trim-notice svg { flex-shrink: 0; stroke: var(--accent); width: 16px; height: 16px; }
+
+    /* analyze button */
+    .analyze-row { margin-top: 1.8rem; text-align: center; }
+
+    /* ---- PREVIEW TABLE ---- */
+    .csv-preview {
+      display: none; margin-top: 1.2rem; background: var(--surface);
+      border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden;
+      animation: fadeUp .35s ease;
+    }
+    .csv-preview.visible { display: block; }
+    @keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+    .preview-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: .75rem 1.2rem; border-bottom: 1px solid var(--border);
+    }
+    .preview-file-info { display: flex; align-items: center; gap: .6rem; }
+    .file-icon { width: 30px; height: 30px; border-radius: 8px; background: var(--accent-light); display: flex; align-items: center; justify-content: center; }
+    .file-icon svg { stroke: var(--accent); width: 14px; height: 14px; }
+    .file-name { font-weight: 600; font-size: .84rem; }
+    .file-meta { font-size: .7rem; color: var(--text-muted); }
+    .preview-actions { display: flex; gap: .4rem; }
+    .btn-icon {
+      width: 30px; height: 30px; border-radius: 8px; border: 1px solid var(--border);
+      background: var(--bg); cursor: pointer; display: flex; align-items: center; justify-content: center;
+      transition: background .15s, border-color .15s;
+    }
+    .btn-icon:hover { border-color: var(--accent); background: var(--accent-light); }
+    .btn-icon svg { stroke: var(--text-muted); width: 14px; height: 14px; }
+    .btn-icon:hover svg { stroke: var(--accent); }
+    .preview-table-wrap {
+      overflow: auto; max-height: 180px; scrollbar-width: thin; scrollbar-color: var(--border) transparent;
+    }
+    .preview-table-wrap::-webkit-scrollbar { width: 6px; height: 6px; }
+    .preview-table-wrap::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+    .csv-table { width: 100%; border-collapse: collapse; font-size: .76rem; white-space: nowrap; }
+    .csv-table thead { position: sticky; top: 0; z-index: 2; }
+    .csv-table th {
+      background: var(--bg); font-weight: 600; text-align: left; padding: .45rem .7rem;
+      border-bottom: 1px solid var(--border); color: var(--text-muted);
+      font-size: .68rem; text-transform: uppercase; letter-spacing: .06em;
+    }
+    .csv-table td { padding: .35rem .7rem; border-bottom: 1px solid #f0ece7; font-variant-numeric: tabular-nums; }
+    .csv-table tbody tr:hover { background: var(--accent-light); }
+    .preview-footer { padding: .5rem 1.2rem; font-size: .7rem; color: var(--text-muted); border-top: 1px solid var(--border); text-align: center; }
+
+    /* tab switcher for preview */
+    .preview-tabs { display: flex; gap: 0; margin-top: 1.2rem; }
+    .preview-tab {
+      flex: 1; padding: .6rem; text-align: center; font-size: .8rem; font-weight: 600;
+      background: var(--bg); border: 1px solid var(--border); cursor: pointer;
+      transition: background .15s, color .15s;
+    }
+    .preview-tab:first-child { border-radius: var(--radius) 0 0 0; }
+    .preview-tab:last-child { border-radius: 0 var(--radius) 0 0; border-left: none; }
+    .preview-tab.active { background: var(--surface); color: var(--accent); border-bottom-color: var(--surface); }
+
+    /* ---- MODAL ---- */
+    .modal-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(26,26,26,.45); backdrop-filter: blur(6px);
+      z-index: 500; animation: fadeIn .2s ease;
+    }
+    .modal-overlay.visible { display: flex; align-items: center; justify-content: center; }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    .modal-content {
+      background: var(--surface); border-radius: var(--radius);
+      width: 92vw; max-width: 1100px; max-height: 85vh;
+      display: flex; flex-direction: column;
+      box-shadow: 0 24px 80px rgba(0,0,0,.18); animation: scaleIn .25s ease;
+    }
+    @keyframes scaleIn { from { opacity: 0; transform: scale(.96); } to { opacity: 1; transform: scale(1); } }
+    .modal-content .preview-table-wrap { max-height: none; flex: 1; overflow: auto; }
+
+    /* ---- CHARTS ---- */
+    #analysis { display: none; }
+    #analysis.visible { display: block; }
+    .charts-grid { display: grid; grid-template-columns: 1fr; gap: 1.5rem; margin-top: 1.5rem; }
+    .chart-card {
+      background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow);
+      padding: 1.5rem; animation: fadeUp .45s ease;
+    }
+    .chart-card h4 { font-family: 'Instrument Serif', serif; font-size: 1.1rem; margin-bottom: .2rem; }
+    .chart-card .chart-sub { font-size: .76rem; color: var(--text-muted); margin-bottom: 1rem; line-height: 1.4; }
+    .chart-card canvas { width: 100% !important; }
+    .charts-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+    @media (max-width: 700px) { .charts-row { grid-template-columns: 1fr; } }
+
+    /* stats comparison */
+    .stats-compare {
+      display: grid; grid-template-columns: 1fr auto 1fr; gap: 0; margin-top: 1.5rem;
+      background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden;
+    }
+    .stats-col { padding: 1.5rem; }
+    .stats-col.left { text-align: right; }
+    .stats-col.right { text-align: left; }
+    .stats-divider { width: 1px; background: var(--border); }
+    .stats-col-title {
+      font-size: .72rem; text-transform: uppercase; letter-spacing: .08em;
+      font-weight: 700; margin-bottom: 1rem;
+    }
+    .stats-col.left .stats-col-title { color: var(--open-color); }
+    .stats-col.right .stats-col-title { color: var(--closed-color); }
+    .stat-row { display: flex; justify-content: space-between; align-items: center; padding: .4rem 0; }
+    .stats-col.left .stat-row { flex-direction: row-reverse; }
+    .stat-row .stat-val {
+      font-family: 'Instrument Serif', serif; font-size: 1.15rem; min-width: 60px;
+    }
+    .stat-row .stat-lbl { font-size: .75rem; color: var(--text-muted); }
+    .stat-row + .stat-row { border-top: 1px solid #f0ece7; }
+
+    /* delta badges */
+    .delta { font-size: .7rem; font-weight: 600; padding: .15rem .5rem; border-radius: 99px; margin-left: .4rem; }
+    .delta-up { background: rgba(192,57,43,.1); color: #c0392b; }
+    .delta-down { background: rgba(39,174,96,.1); color: #27ae60; }
+
+    /* ---- LEGEND INLINE ---- */
+    .chart-legend {
+      display: flex; gap: 1.2rem; margin-bottom: .8rem; font-size: .78rem; font-weight: 500;
+    }
+    .chart-legend .leg-item { display: flex; align-items: center; gap: .35rem; }
+    .leg-dot { width: 10px; height: 10px; border-radius: 50%; }
+
+    /* ---- INSIGHTS PANEL ---- */
+    .insights-panel {
+      display: none; margin-top: 1.5rem;
+      background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow);
+      padding: 1.8rem; animation: fadeUp .45s ease;
+    }
+    .insights-panel.visible { display: block; }
+    .insights-title {
+      font-family: 'Instrument Serif', serif; font-size: 1.2rem; margin-bottom: .2rem;
+    }
+    .insights-subtitle { font-size: .78rem; color: var(--text-muted); margin-bottom: 1.2rem; }
+    .insight-row {
+      display: flex; align-items: flex-start; gap: .8rem;
+      padding: .75rem 0;
+    }
+    .insight-row + .insight-row { border-top: 1px solid #f0ece7; }
+    .insight-icon {
+      width: 32px; height: 32px; border-radius: 8px;
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+      font-size: .9rem;
+    }
+    .insight-icon.warn { background: rgba(192,57,43,.1); }
+    .insight-icon.ok { background: rgba(39,174,96,.1); }
+    .insight-icon.info { background: rgba(41,128,185,.1); }
+    .insight-body h5 { font-size: .88rem; font-weight: 600; margin-bottom: .15rem; }
+    .insight-body p { font-size: .8rem; color: var(--text-muted); line-height: 1.5; }
+    .insight-bar-wrap {
+      margin-top: .5rem; height: 6px; border-radius: 3px; background: #eee;
+      overflow: hidden; max-width: 280px;
+    }
+    .insight-bar { height: 100%; border-radius: 3px; transition: width .6s ease; }
+    .bar-blue { background: #2980b9; }
+    .bar-red { background: #c0392b; }
+    .bar-green { background: #27ae60; }
+    .bar-orange { background: #e67e22; }
+
+    .romberg-verdict {
+      margin-top: 1.2rem; padding: 1rem 1.2rem; border-radius: 10px;
+      display: flex; align-items: center; gap: .8rem;
+    }
+    .verdict-stable { background: rgba(39,174,96,.08); border: 1px solid rgba(39,174,96,.2); }
+    .verdict-impaired { background: rgba(192,57,43,.08); border: 1px solid rgba(192,57,43,.2); }
+    .verdict-icon { font-size: 1.5rem; }
+    .verdict-text h5 { font-size: .92rem; font-weight: 700; }
+    .verdict-text p { font-size: .78rem; color: var(--text-muted); line-height: 1.45; margin-top: .1rem; }
+
+    /* ---- INFO CARDS ---- */
+    .card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1.25rem; margin-top: 1.5rem; }
+    .info-card {
+      background: var(--surface); border-radius: var(--radius); padding: 1.8rem 1.5rem;
+      box-shadow: var(--shadow); transition: transform .2s;
+    }
+    .info-card:hover { transform: translateY(-3px); }
+    .info-card h4 { font-family: 'Instrument Serif', serif; font-size: 1.15rem; margin-bottom: .5rem; }
+    .info-card p { color: var(--text-muted); font-size: .88rem; line-height: 1.55; }
+
+    /* ---- FOOTER ---- */
+    footer { text-align: center; padding: 2.5rem; color: var(--text-muted); font-size: .8rem; border-top: 1px solid var(--border); }
+  </style>
+</head>
+<body>
+
+  <nav>
+    <div class="logo">Romberger <span>balance</span></div>
+    <div class="nav-links">
+      <a href="#upload">Upload</a>
+      <a href="#analysis">Analysis</a>
+      <a href="#learn">Learn</a>
+      <a href="#about">About</a>
+    </div>
+  </nav>
+
+  <section class="hero">
+    <h1>Test your balance.<br>See the difference.</h1>
+    <p>Upload two 40‑second accelerometer recordings — eyes open and eyes closed — and compare your postural stability side by side.</p>
+    <a href="#upload" class="btn-primary">Get started</a>
+  </section>
+
+  <!-- ============ UPLOAD ============ -->
+  <section id="upload">
+    <p class="section-label">Record &amp; Upload</p>
+    <h2 class="section-title">Upload both recordings</h2>
+    <p class="section-desc">Use Sensor Logger with the phone held chest-height (crossed arms). Record ~40 seconds for each condition, then export the Accelerometer CSV.</p>
+
+    <div class="upload-pair">
+      <!-- Eyes Open -->
+      <div class="upload-zone" id="zoneOpen" data-type="open">
+        <input type="file" accept=".csv" hidden>
+        <button class="zone-remove" title="Remove">&times;</button>
+        <div class="zone-badge badge-open"><span class="dot"></span> Eyes Open</div>
+        <div class="zone-icon"><svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></div>
+        <h3>Baseline — control</h3>
+        <p>Upload the CSV from your eyes‑open standing trial</p>
+        <div class="zone-file-info"><div class="zone-file-name"></div><div class="zone-file-meta"></div></div>
+      </div>
+      <!-- Eyes Closed -->
+      <div class="upload-zone" id="zoneClosed" data-type="closed">
+        <input type="file" accept=".csv" hidden>
+        <button class="zone-remove" title="Remove">&times;</button>
+        <div class="zone-badge badge-closed"><span class="dot"></span> Eyes Closed</div>
+        <div class="zone-icon"><svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></div>
+        <h3>Test — impaired</h3>
+        <p>Upload the CSV from your eyes‑closed standing trial</p>
+        <div class="zone-file-info"><div class="zone-file-name"></div><div class="zone-file-meta"></div></div>
+      </div>
+    </div>
+
+    <div class="trim-notice">
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      Auto‑trim enabled — the first and last 5 seconds of each recording are discarded to remove phone handling artifacts.
+    </div>
+
+    <!-- Preview tabs -->
+    <div class="preview-tabs" id="previewTabs" style="display:none">
+      <div class="preview-tab active" data-target="open">Eyes Open</div>
+      <div class="preview-tab" data-target="closed">Eyes Closed</div>
+    </div>
+    <div class="csv-preview" id="csvPreview">
+      <div class="preview-header">
+        <div class="preview-file-info">
+          <div class="file-icon"><svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div>
+          <div><div class="file-name" id="prevName">—</div><div class="file-meta" id="prevMeta">—</div></div>
+        </div>
+        <div class="preview-actions">
+          <button class="btn-icon" id="btnExpand" title="Expand"><svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg></button>
+        </div>
+      </div>
+      <div class="preview-table-wrap" id="prevTable"></div>
+      <div class="preview-footer" id="prevFooter">—</div>
+    </div>
+
+    <div class="analyze-row">
+      <button class="btn-primary" id="btnAnalyze" disabled>Compare both recordings</button>
+    </div>
+  </section>
+
+  <!-- ============ ANALYSIS ============ -->
+  <section id="analysis">
+    <p class="section-label">Comparison</p>
+    <h2 class="section-title">Eyes open vs. eyes closed</h2>
+    <p class="section-desc">Side‑by‑side analysis of postural stability. Larger divergence in the closed‑eye condition indicates stronger reliance on vision for balance.</p>
+
+    <!-- Stats face-off -->
+    <div class="stats-compare" id="statsCompare"></div>
+
+    <!-- Dynamic Insights -->
+    <div class="insights-panel" id="insightsPanel"></div>
+
+    <div class="charts-grid">
+      <!-- Overlay: sway magnitude -->
+      <div class="chart-card">
+        <h4>Sway magnitude — overlay</h4>
+        <p class="chart-sub">Total sway √(x²+y²+z²) for both conditions on a common time axis (trimmed)</p>
+        <div class="chart-legend">
+          <div class="leg-item"><span class="leg-dot" style="background:var(--open-color)"></span> Eyes open</div>
+          <div class="leg-item"><span class="leg-dot" style="background:var(--closed-color)"></span> Eyes closed</div>
+        </div>
+        <canvas id="chartSwayOverlay" height="220"></canvas>
+      </div>
+
+      <div class="charts-row">
+        <!-- Sway path open -->
+        <div class="chart-card">
+          <h4>Sway path — eyes open</h4>
+          <p class="chart-sub">X vs Y acceleration — axes auto‑scaled to data range</p>
+          <canvas id="chartPathOpen" height="220"></canvas>
+        </div>
+        <!-- Sway path closed -->
+        <div class="chart-card">
+          <h4>Sway path — eyes closed</h4>
+          <p class="chart-sub">X vs Y acceleration — axes auto‑scaled to data range</p>
+          <canvas id="chartPathClosed" height="220"></canvas>
+        </div>
+      </div>
+
+      <!-- 3-axis overlay -->
+      <div class="chart-card">
+        <h4>3‑axis acceleration — overlay</h4>
+        <p class="chart-sub">X, Y, Z channels for both conditions. Solid = eyes open, dashed = eyes closed</p>
+        <canvas id="chartAxesOverlay" height="240"></canvas>
+      </div>
+
+      <!-- Rolling RMS divergence -->
+      <div class="chart-card">
+        <h4>Rolling RMS sway — divergence</h4>
+        <p class="chart-sub">1‑second rolling window RMS. The shaded gap between curves shows where balance degrades with eyes closed</p>
+        <div class="chart-legend">
+          <div class="leg-item"><span class="leg-dot" style="background:var(--open-color)"></span> Eyes open</div>
+          <div class="leg-item"><span class="leg-dot" style="background:var(--closed-color)"></span> Eyes closed</div>
+        </div>
+        <canvas id="chartRollingRMS" height="220"></canvas>
+      </div>
+
+      <div class="charts-row">
+        <!-- Distribution overlay -->
+        <div class="chart-card">
+          <h4>Sway distribution — comparison</h4>
+          <p class="chart-sub">Overlaid histograms of sway magnitude</p>
+          <canvas id="chartHistOverlay" height="200"></canvas>
+        </div>
+        <!-- Delta magnitude -->
+        <div class="chart-card">
+          <h4>Sway delta (closed − open)</h4>
+          <p class="chart-sub">Positive values (red) = more sway when eyes are closed</p>
+          <canvas id="chartDelta" height="200"></canvas>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Modal -->
+  <div class="modal-overlay" id="modal">
+    <div class="modal-content">
+      <div class="preview-header">
+        <div class="preview-file-info">
+          <div class="file-icon"><svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div>
+          <div><div class="file-name" id="modalName">—</div><div class="file-meta" id="modalMeta">—</div></div>
+        </div>
+        <div class="preview-actions">
+          <button class="btn-icon" id="btnCloseModal" title="Close"><svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+        </div>
+      </div>
+      <div class="preview-table-wrap" id="modalTable"></div>
+    </div>
+  </div>
+
+  <!-- Learn -->
+  <section id="learn">
+    <p class="section-label">Learn</p>
+    <h2 class="section-title">Understanding balance</h2>
+    <p class="section-desc">Balance relies on three sensory systems working together. Explore the science behind the test.</p>
+    <div class="card-grid">
+      <div class="info-card"><h4>What is balance?</h4><p>Vision, the vestibular system, and proprioception combine to keep you upright. Learn how each contributes.</p></div>
+      <div class="info-card"><h4>Loss of balance</h4><p>Neurological, sensory, and fatigue‑related factors that can affect postural stability.</p></div>
+      <div class="info-card"><h4>The Romberg Test</h4><p>A classic neurological exam for proprioception. Understand its clinical purpose and interpretation limits.</p></div>
+    </div>
+  </section>
+
+  <section id="about">
+    <p class="section-label">About</p>
+    <h2 class="section-title">What is Romberger?</h2>
+    <p class="section-desc">Romberger is an educational tool — not a diagnostic device. Record two standing trials, upload the CSVs, and see how removing visual input affects your postural stability. Inspired by the clinical Romberg test.</p>
+  </section>
+
+  <footer><p>Romberger — an educational balance exploration tool. Not intended for clinical use.</p></footer>
+
+  <script>
+    /* ==========================================================
+       STATE
+    ========================================================== */
+    const TRIM_SEC = 5;
+    const state = { open: null, closed: null };   // { name, size, headers, rows, trimmed:{t,x,y,z,mag} }
+    let activePreview = 'open';
+    let charts = {};
+
+    /* ==========================================================
+       DOM
+    ========================================================== */
+    const zones = {
+      open:   document.getElementById('zoneOpen'),
+      closed: document.getElementById('zoneClosed'),
+    };
+    const previewTabs   = document.getElementById('previewTabs');
+    const csvPreview    = document.getElementById('csvPreview');
+    const prevName      = document.getElementById('prevName');
+    const prevMeta      = document.getElementById('prevMeta');
+    const prevTable     = document.getElementById('prevTable');
+    const prevFooter    = document.getElementById('prevFooter');
+    const btnExpand     = document.getElementById('btnExpand');
+    const btnAnalyze    = document.getElementById('btnAnalyze');
+    const analysisSection = document.getElementById('analysis');
+    const modal         = document.getElementById('modal');
+    const modalTable    = document.getElementById('modalTable');
+    const modalNameEl   = document.getElementById('modalName');
+    const modalMetaEl   = document.getElementById('modalMeta');
+    const btnCloseModal = document.getElementById('btnCloseModal');
+
+    /* ==========================================================
+       UTILS
+    ========================================================== */
+    function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+    function fmtB(b) { return b < 1024 ? b+' B' : b < 1048576 ? (b/1024).toFixed(1)+' KB' : (b/1048576).toFixed(1)+' MB'; }
+
+    function parseCSV(text) {
+      const lines = text.trim().split('\n').map(l => l.trim()).filter(l => l);
+      const headers = lines[0].split(',').map(h => h.replace(/^"|"$/g,'').trim());
+      const rows = lines.slice(1).map(l => l.split(',').map(c => c.replace(/^"|"$/g,'').trim()));
+      return { headers, rows };
+    }
+
+    function extractAccel(headers, rows) {
+      const xi = headers.indexOf('x'), yi = headers.indexOf('y'),
+            zi = headers.indexOf('z'), ti = headers.indexOf('seconds_elapsed');
+      if (xi<0||yi<0||zi<0||ti<0) return null;
+      const t=[],x=[],y=[],z=[],mag=[];
+      for (const r of rows) {
+        const tv=+r[ti], xv=+r[xi], yv=+r[yi], zv=+r[zi];
+        if (isNaN(tv)) continue;
+        t.push(tv); x.push(xv); y.push(yv); z.push(zv);
+        mag.push(Math.sqrt(xv*xv+yv*yv+zv*zv));
+      }
+      return { t, x, y, z, mag };
+    }
+
+    function trimData(d) {
+      const tMin = d.t[0] + TRIM_SEC;
+      const tMax = d.t[d.t.length-1] - TRIM_SEC;
+      const t=[],x=[],y=[],z=[],mag=[];
+      for (let i=0; i<d.t.length; i++) {
+        if (d.t[i] >= tMin && d.t[i] <= tMax) {
+          t.push(d.t[i]-tMin); x.push(d.x[i]); y.push(d.y[i]); z.push(d.z[i]); mag.push(d.mag[i]);
+        }
+      }
+      return { t, x, y, z, mag };
+    }
+
+    function buildTable(headers, rows, max) {
+      const disp = max ? rows.slice(0, max) : rows;
+      let h = '<table class="csv-table"><thead><tr><th>#</th>';
+      headers.forEach(c => h += `<th>${esc(c)}</th>`);
+      h += '</tr></thead><tbody>';
+      disp.forEach((r,i) => { h += `<tr><td style="color:var(--text-muted)">${i+1}</td>`; r.forEach(c => h += `<td>${esc(c)}</td>`); h += '</tr>'; });
+      return h + '</tbody></table>';
+    }
+
+    function ds(arr, n) {
+      if (arr.length <= n) return [...arr];
+      const step = arr.length / n;
+      return Array.from({length:n},(_,i)=>arr[Math.floor(i*step)]);
+    }
+
+    function rollingRMS(arr, t, windowSec) {
+      const out = [];
+      for (let i = 0; i < arr.length; i++) {
+        let sum = 0, count = 0;
+        for (let j = i; j >= 0 && t[i] - t[j] <= windowSec; j--) { sum += arr[j]*arr[j]; count++; }
+        out.push(Math.sqrt(sum / count));
+      }
+      return out;
+    }
+
+    /* ==========================================================
+       ZONE UPLOAD LOGIC
+    ========================================================== */
+    for (const type of ['open','closed']) {
+      const zone = zones[type];
+      const input = zone.querySelector('input[type=file]');
+      const remove = zone.querySelector('.zone-remove');
+
+      zone.addEventListener('click', (e) => {
+        if (e.target === remove || e.target.closest('.zone-remove')) return;
+        input.click();
+      });
+      input.addEventListener('change', () => { if (input.files[0]) loadFile(type, input.files[0]); });
+
+      zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
+      zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+      zone.addEventListener('drop', e => {
+        e.preventDefault(); zone.classList.remove('drag-over');
+        const f = e.dataTransfer.files[0];
+        if (f && f.name.toLowerCase().endsWith('.csv')) loadFile(type, f);
+      });
+
+      remove.addEventListener('click', (e) => {
+        e.stopPropagation();
+        clearZone(type);
+      });
+    }
+
+    function loadFile(type, file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const { headers, rows } = parseCSV(e.target.result);
+          const raw = extractAccel(headers, rows);
+          if (!raw) { alert('CSV must contain columns: time, seconds_elapsed, x, y, z'); return; }
+          const trimmed = trimData(raw);
+          if (trimmed.t.length < 50) { alert('Not enough data after trimming 5s from each end.'); return; }
+          state[type] = { name: file.name, size: file.size, headers, rows, trimmed };
+          updateZoneUI(type);
+          updatePreview(type);
+          updateAnalyzeBtn();
+        } catch (err) { alert('Error: ' + err.message); }
+      };
+      reader.readAsText(file);
+    }
+
+    function clearZone(type) {
+      state[type] = null;
+      const zone = zones[type];
+      zone.classList.remove('loaded', 'type-'+type);
+      zone.querySelector('.zone-file-info').classList.remove('visible');
+      zone.querySelector('input[type=file]').value = '';
+      updateAnalyzeBtn();
+      if (!state.open && !state.closed) {
+        previewTabs.style.display = 'none';
+        csvPreview.classList.remove('visible');
+        analysisSection.classList.remove('visible');
+      } else {
+        const other = type === 'open' ? 'closed' : 'open';
+        if (state[other]) updatePreview(other);
+      }
+      if (analysisSection.classList.contains('visible') && (!state.open || !state.closed)) {
+        analysisSection.classList.remove('visible');
+      }
+    }
+
+    function updateZoneUI(type) {
+      const zone = zones[type];
+      const s = state[type];
+      zone.classList.add('loaded', 'type-'+type);
+      const info = zone.querySelector('.zone-file-info');
+      info.classList.add('visible');
+      info.querySelector('.zone-file-name').textContent = s.name;
+      const dur = s.trimmed.t[s.trimmed.t.length-1].toFixed(1);
+      info.querySelector('.zone-file-meta').textContent = `${fmtB(s.size)} · ${s.rows.length} raw rows · ${s.trimmed.t.length} after trim (${dur}s)`;
+    }
+
+    function updateAnalyzeBtn() {
+      btnAnalyze.disabled = !(state.open && state.closed);
+    }
+
+    /* ==========================================================
+       PREVIEW
+    ========================================================== */
+    function updatePreview(type) {
+      activePreview = type;
+      previewTabs.style.display = 'flex';
+      document.querySelectorAll('.preview-tab').forEach(t => t.classList.toggle('active', t.dataset.target === type));
+      showPreviewFor(type);
+    }
+
+    function showPreviewFor(type) {
+      const s = state[type];
+      if (!s) { csvPreview.classList.remove('visible'); return; }
+      prevName.textContent = s.name + (type === 'open' ? ' (eyes open)' : ' (eyes closed)');
+      prevMeta.textContent = `${s.headers.length} cols · ${s.trimmed.t.length} trimmed rows · ${fmtB(s.size)}`;
+      const MINI = 6;
+      prevTable.innerHTML = buildTable(s.headers, s.rows, MINI);
+      const extra = s.rows.length - MINI;
+      prevFooter.textContent = extra > 0 ? `Showing ${MINI} of ${s.rows.length} raw rows — expand to see all` : `All ${s.rows.length} rows`;
+      csvPreview.classList.add('visible');
+    }
+
+    document.querySelectorAll('.preview-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        const type = tab.dataset.target;
+        if (state[type]) updatePreview(type);
+      });
+    });
+
+    /* ==========================================================
+       MODAL
+    ========================================================== */
+    function openModal() {
+      const s = state[activePreview];
+      if (!s) return;
+      modalNameEl.textContent = s.name;
+      modalMetaEl.textContent = `${s.headers.length} cols · ${s.rows.length} rows · ${fmtB(s.size)}`;
+      modalTable.innerHTML = buildTable(s.headers, s.rows);
+      modal.classList.add('visible'); document.body.style.overflow = 'hidden';
+    }
+    function closeModal() { modal.classList.remove('visible'); document.body.style.overflow = ''; }
+    btnExpand.addEventListener('click', e => { e.stopPropagation(); openModal(); });
+    btnCloseModal.addEventListener('click', closeModal);
+    modal.addEventListener('click', e => { if (e.target === modal) closeModal(); });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+    /* ==========================================================
+       ANALYZE
+    ========================================================== */
+    btnAnalyze.addEventListener('click', runAnalysis);
+
+    function runAnalysis() {
+      if (!state.open || !state.closed) return;
+      const o = state.open.trimmed;
+      const c = state.closed.trimmed;
+
+      analysisSection.classList.add('visible');
+      Object.values(charts).forEach(ch => ch.destroy());
+      charts = {};
+
+      /* --- Stats --- */
+      function calcStats(d) {
+        const n = d.mag.length;
+        const rms = Math.sqrt(d.mag.reduce((s,v) => s+v*v,0)/n);
+        const mean = d.mag.reduce((a,b)=>a+b,0)/n;
+        const peak = Math.max(...d.mag);
+        const std = Math.sqrt(d.mag.reduce((s,v) => s+(v-mean)**2,0)/n);
+        let jerk = 0;
+        for (let i=1;i<n;i++) { const dt=d.t[i]-d.t[i-1]; if(dt>0) jerk+=Math.abs(d.mag[i]-d.mag[i-1])/dt; }
+        jerk /= (n-1);
+        let path = 0;
+        for (let i=1;i<d.x.length;i++) path += Math.sqrt((d.x[i]-d.x[i-1])**2+(d.y[i]-d.y[i-1])**2);
+        const dur = d.t[d.t.length-1];
+        return { rms, mean, peak, std, jerk, path, dur, n };
+      }
+      const so = calcStats(o), sc = calcStats(c);
+
+      function deltaHTML(ov, cv) {
+        const pct = ((cv - ov) / ov * 100);
+        if (Math.abs(pct) < 0.5) return '';
+        const cls = pct > 0 ? 'delta-up' : 'delta-down';
+        const sign = pct > 0 ? '+' : '';
+        return `<span class="delta ${cls}">${sign}${pct.toFixed(0)}%</span>`;
+      }
+
+      const metrics = [
+        ['RMS Sway', so.rms, sc.rms, 3],
+        ['Peak Sway', so.peak, sc.peak, 3],
+        ['Std Dev', so.std, sc.std, 3],
+        ['Mean Jerk', so.jerk, sc.jerk, 2],
+        ['Path Length', so.path, sc.path, 1],
+        ['Duration', so.dur, sc.dur, 1],
+        ['Samples', so.n, sc.n, 0],
+      ];
+
+      let statsHTML = `<div class="stats-col left"><div class="stats-col-title">Eyes Open (baseline)</div>`;
+      metrics.forEach(([lbl, ov]) => {
+        statsHTML += `<div class="stat-row"><span class="stat-val">${typeof ov==='number'? (Number.isInteger(ov)?ov:ov.toFixed(metrics.find(m=>m[0]===lbl)[3])):ov}</span><span class="stat-lbl">${lbl}</span></div>`;
+      });
+      statsHTML += `</div><div class="stats-divider"></div><div class="stats-col right"><div class="stats-col-title">Eyes Closed (test)</div>`;
+      metrics.forEach(([lbl, ov, cv, dec]) => {
+        statsHTML += `<div class="stat-row"><span class="stat-lbl">${lbl}</span><span class="stat-val">${typeof cv==='number'? (Number.isInteger(cv)?cv:cv.toFixed(dec)):cv}${deltaHTML(ov,cv)}</span></div>`;
+      });
+      statsHTML += `</div>`;
+      document.getElementById('statsCompare').innerHTML = statsHTML;
+
+      /* --- Generate Insights --- */
+      const insightsEl = document.getElementById('insightsPanel');
+      const rmsPctChange = ((sc.rms - so.rms) / so.rms * 100);
+      const peakPctChange = ((sc.peak - so.peak) / so.peak * 100);
+      const pathPctChange = ((sc.path - so.path) / so.path * 100);
+      const jerkPctChange = ((sc.jerk - so.jerk) / so.jerk * 100);
+      const stdPctChange = ((sc.std - so.std) / so.std * 100);
+
+      // Romberg quotient: ratio of eyes-closed RMS to eyes-open RMS
+      const rombergQ = sc.rms / so.rms;
+
+      // Sway area (bounding ellipse proxy): std of X * std of Y
+      const stdXo = Math.sqrt(o.x.reduce((s,v) => s+(v-o.x.reduce((a,b)=>a+b,0)/o.x.length)**2,0)/o.x.length);
+      const stdYo = Math.sqrt(o.y.reduce((s,v) => s+(v-o.y.reduce((a,b)=>a+b,0)/o.y.length)**2,0)/o.y.length);
+      const stdXc = Math.sqrt(c.x.reduce((s,v) => s+(v-c.x.reduce((a,b)=>a+b,0)/c.x.length)**2,0)/c.x.length);
+      const stdYc = Math.sqrt(c.y.reduce((s,v) => s+(v-c.y.reduce((a,b)=>a+b,0)/c.y.length)**2,0)/c.y.length);
+      const areaO = Math.PI * stdXo * stdYo;
+      const areaC = Math.PI * stdXc * stdYc;
+      const areaPctChange = ((areaC - areaO) / areaO * 100);
+
+      let insHTML = `<h4 class="insights-title">Key findings</h4>
+        <p class="insights-subtitle">Automated comparison of eyes‑open baseline vs. eyes‑closed test condition</p>`;
+
+      // 1) Romberg Quotient
+      const rqLevel = rombergQ < 1.2 ? 'ok' : rombergQ < 2.0 ? 'warn' : 'warn';
+      const rqIcon = rombergQ < 1.2 ? '✓' : '⚠';
+      const rqDesc = rombergQ < 1.2
+        ? 'A quotient near 1.0 suggests minimal reliance on vision for balance — strong proprioceptive function.'
+        : rombergQ < 2.0
+          ? 'A moderate increase suggests some reliance on visual input for postural stability.'
+          : 'A high quotient indicates significant balance degradation when visual input is removed — consistent with a positive Romberg sign.';
+      insHTML += `<div class="insight-row">
+        <div class="insight-icon ${rqLevel}">${rqIcon}</div>
+        <div class="insight-body">
+          <h5>Romberg Quotient: ${rombergQ.toFixed(2)}</h5>
+          <p>Ratio of eyes‑closed to eyes‑open RMS sway. ${rqDesc}</p>
+          <div class="insight-bar-wrap"><div class="insight-bar ${rombergQ < 1.2 ? 'bar-green' : rombergQ < 2.0 ? 'bar-orange' : 'bar-red'}" style="width:${Math.min(rombergQ/3*100,100)}%"></div></div>
+        </div>
+      </div>`;
+
+      // 2) RMS Sway
+      insHTML += `<div class="insight-row">
+        <div class="insight-icon ${rmsPctChange > 30 ? 'warn' : 'info'}">${rmsPctChange > 30 ? '↑' : '≈'}</div>
+        <div class="insight-body">
+          <h5>RMS sway ${rmsPctChange > 0 ? 'increased' : 'decreased'} by ${Math.abs(rmsPctChange).toFixed(1)}%</h5>
+          <p>Open: ${so.rms.toFixed(4)} → Closed: ${sc.rms.toFixed(4)}. ${rmsPctChange > 30 ? 'This is a notable increase in overall postural instability with eyes closed.' : 'The change is modest, suggesting reasonable balance maintenance even without vision.'}</p>
+        </div>
+      </div>`;
+
+      // 3) Sway area
+      insHTML += `<div class="insight-row">
+        <div class="insight-icon ${areaPctChange > 50 ? 'warn' : 'info'}">${areaPctChange > 50 ? '⬡' : '•'}</div>
+        <div class="insight-body">
+          <h5>Sway ellipse area ${areaPctChange > 0 ? 'grew' : 'shrank'} by ${Math.abs(areaPctChange).toFixed(1)}%</h5>
+          <p>The 95% confidence ellipse (σ_x × σ_y) went from ${areaO.toFixed(4)} to ${areaC.toFixed(4)} m²/s⁴. ${areaPctChange > 50 ? 'The postural footprint expanded substantially, indicating wider excursions when visual feedback was removed.' : 'The sway footprint remained relatively contained across both conditions.'}</p>
+        </div>
+      </div>`;
+
+      // 4) Jerk
+      insHTML += `<div class="insight-row">
+        <div class="insight-icon ${jerkPctChange > 25 ? 'warn' : 'ok'}">${jerkPctChange > 25 ? '⚡' : '~'}</div>
+        <div class="insight-body">
+          <h5>Mean jerk ${jerkPctChange > 0 ? 'increased' : 'decreased'} by ${Math.abs(jerkPctChange).toFixed(1)}%</h5>
+          <p>Jerk measures how abruptly corrections occur. ${jerkPctChange > 25 ? 'Higher jerk with eyes closed indicates the body is making more frequent, reactive corrections to maintain balance.' : 'Correction dynamics stayed similar — the neuromuscular control strategy did not change dramatically.'}</p>
+        </div>
+      </div>`;
+
+      // 5) Path length
+      insHTML += `<div class="insight-row">
+        <div class="insight-icon info">↗</div>
+        <div class="insight-body">
+          <h5>Sway path length: ${so.path.toFixed(1)} → ${sc.path.toFixed(1)} (${pathPctChange > 0 ? '+' : ''}${pathPctChange.toFixed(1)}%)</h5>
+          <p>Total distance traveled in the X‑Y acceleration plane. Longer paths mean more continuous postural adjustments. ${pathPctChange > 40 ? 'The closed‑eye condition required substantially more corrective movement.' : 'Both conditions show comparable levels of corrective motion.'}</p>
+        </div>
+      </div>`;
+
+      // 6) Peak sway
+      insHTML += `<div class="insight-row">
+        <div class="insight-icon ${peakPctChange > 40 ? 'warn' : 'info'}">${peakPctChange > 40 ? '▲' : '△'}</div>
+        <div class="insight-body">
+          <h5>Peak sway: ${so.peak.toFixed(3)} → ${sc.peak.toFixed(3)} (${peakPctChange > 0 ? '+' : ''}${peakPctChange.toFixed(1)}%)</h5>
+          <p>The single largest instantaneous sway value. ${peakPctChange > 40 ? 'A much higher peak with eyes closed can indicate momentary loss of stability — the kind of event a clinician watches for in the Romberg test.' : 'Peak values stayed in a similar range, suggesting no sudden balance lapses.'}</p>
+        </div>
+      </div>`;
+
+      // Overall verdict
+      const isImpaired = rombergQ >= 1.4 || rmsPctChange > 30;
+      insHTML += `<div class="romberg-verdict ${isImpaired ? 'verdict-impaired' : 'verdict-stable'}">
+        <div class="verdict-icon">${isImpaired ? '⚠️' : '✅'}</div>
+        <div class="verdict-text">
+          <h5>${isImpaired ? 'Simulated impairment detected' : 'Balance appears stable across both conditions'}</h5>
+          <p>${isImpaired
+            ? 'The eyes‑closed recording shows meaningfully higher sway than the baseline. In a clinical setting, this pattern is consistent with a positive Romberg sign — increased reliance on vision for balance. This is educational, not diagnostic.'
+            : 'Both recordings show similar postural stability. The subject maintained effective balance even without visual input, suggesting strong proprioceptive and vestibular function. This is educational, not diagnostic.'
+          }</p>
+        </div>
+      </div>`;
+
+      insightsEl.innerHTML = insHTML;
+      insightsEl.classList.add('visible');
+
+      /* --- Common setup --- */
+      const font = { family: 'DM Sans' };
+      const N = 500;
+      const minLen = Math.min(o.t.length, c.t.length);
+      // Normalize time to common axis
+      const tLabels = ds(o.t.slice(0, minLen), N).map(v => v.toFixed(1));
+
+      const base = {
+        responsive: true,
+        animation: { duration: 600, easing: 'easeOutQuart' },
+        plugins: { legend: { labels: { font: { ...font, size: 11 }, usePointStyle: true, pointStyle: 'circle' } } },
+        elements: { point: { radius: 0 }, line: { borderWidth: 1.5 } },
+      };
+
+      /* 1) Sway overlay */
+      charts.swayOverlay = new Chart(document.getElementById('chartSwayOverlay'), {
+        type: 'line',
+        data: { labels: tLabels, datasets: [
+          { label: 'Eyes open', data: ds(o.mag, N), borderColor: '#2980b9', backgroundColor: 'rgba(41,128,185,.08)', borderWidth: 2, fill: true },
+          { label: 'Eyes closed', data: ds(c.mag, N), borderColor: '#c0392b', backgroundColor: 'rgba(192,57,43,.08)', borderWidth: 2, fill: true },
+        ]},
+        options: { ...base, plugins: { ...base.plugins, legend: { display: false } }, scales: {
+          x: { title: { display:true, text:'Time (s)', font }, ticks: { maxTicksLimit:10, font:{size:10} } },
+          y: { title: { display:true, text:'Sway magnitude', font }, ticks: { font:{size:10} }, beginAtZero: true },
+        }}
+      });
+
+      /* 2) XY paths side by side */
+      // Build scatter data — use ALL points for full cluster visibility
+      function makeScatterData(d) {
+        const pts = [];
+        for (let i = 0; i < d.x.length; i++) pts.push({ x: d.x[i], y: d.y[i] });
+        return pts;
+      }
+
+      // Auto-scale each scatter to its own data with 15% padding
+      function scatterRange(vals) {
+        const mn = Math.min(...vals), mx = Math.max(...vals);
+        const pad = (mx - mn) * 0.15 || 0.01;
+        return [mn - pad, mx + pad];
+      }
+
+      const openPts = makeScatterData(o), closedPts = makeScatterData(c);
+      const oxR = scatterRange(o.x), oyR = scatterRange(o.y);
+      const cxR = scatterRange(c.x), cyR = scatterRange(c.y);
+
+      function pathOpts(xR, yR) {
+        return {
+          ...base, plugins: { ...base.plugins, legend: { display: false } }, aspectRatio: 1.2,
+          scales: {
+            x: { min: xR[0], max: xR[1], title: { display:true, text:'X (m/s²)', font }, ticks: { font:{size:10} } },
+            y: { min: yR[0], max: yR[1], title: { display:true, text:'Y (m/s²)', font }, ticks: { font:{size:10} } },
+          }
+        };
+      }
+
+      charts.pathOpen = new Chart(document.getElementById('chartPathOpen'), {
+        type: 'scatter',
+        data: { datasets: [{ label: 'Eyes open', data: openPts, backgroundColor: 'rgba(41,128,185,.45)', pointRadius: 2.5 }] },
+        options: pathOpts(oxR, oyR)
+      });
+      charts.pathClosed = new Chart(document.getElementById('chartPathClosed'), {
+        type: 'scatter',
+        data: { datasets: [{ label: 'Eyes closed', data: closedPts, backgroundColor: 'rgba(192,57,43,.45)', pointRadius: 2.5 }] },
+        options: pathOpts(cxR, cyR)
+      });
+
+      /* 3) 3-axis overlay */
+      charts.axesOverlay = new Chart(document.getElementById('chartAxesOverlay'), {
+        type: 'line',
+        data: { labels: tLabels, datasets: [
+          { label: 'X open', data: ds(o.x,N), borderColor: '#2980b9', borderWidth:1.5 },
+          { label: 'Y open', data: ds(o.y,N), borderColor: '#27ae60', borderWidth:1.5 },
+          { label: 'Z open', data: ds(o.z,N), borderColor: '#e67e22', borderWidth:1.5 },
+          { label: 'X closed', data: ds(c.x,N), borderColor: '#2980b9', borderDash:[6,3], borderWidth:1.5 },
+          { label: 'Y closed', data: ds(c.y,N), borderColor: '#27ae60', borderDash:[6,3], borderWidth:1.5 },
+          { label: 'Z closed', data: ds(c.z,N), borderColor: '#e67e22', borderDash:[6,3], borderWidth:1.5 },
+        ]},
+        options: { ...base, scales: {
+          x: { title:{display:true,text:'Time (s)',font}, ticks:{maxTicksLimit:10,font:{size:10}} },
+          y: { title:{display:true,text:'Accel (m/s²)',font}, ticks:{font:{size:10}} },
+        }}
+      });
+
+      /* 4) Rolling RMS divergence */
+      const rmsO = rollingRMS(o.mag, o.t, 1.0);
+      const rmsC = rollingRMS(c.mag, c.t, 1.0);
+      // Fill between: create upper and lower for shading
+      const rmsLabels = ds(o.t.slice(0, minLen), N).map(v => v.toFixed(1));
+      const rmsOds = ds(rmsO.slice(0, minLen), N);
+      const rmsCds = ds(rmsC.slice(0, minLen), N);
+
+      charts.rollingRMS = new Chart(document.getElementById('chartRollingRMS'), {
+        type: 'line',
+        data: { labels: rmsLabels, datasets: [
+          { label: 'Eyes open', data: rmsOds, borderColor: '#2980b9', backgroundColor: 'rgba(41,128,185,.1)', fill: false, borderWidth: 2 },
+          { label: 'Eyes closed', data: rmsCds, borderColor: '#c0392b', backgroundColor: 'rgba(192,57,43,.15)', fill: '-1', borderWidth: 2 },
+        ]},
+        options: { ...base, plugins: { ...base.plugins, legend: { display: false },
+          filler: { propagate: true }
+        }, scales: {
+          x: { title:{display:true,text:'Time (s)',font}, ticks:{maxTicksLimit:10,font:{size:10}} },
+          y: { title:{display:true,text:'Rolling RMS',font}, ticks:{font:{size:10}}, beginAtZero:true },
+        }}
+      });
+
+      /* 5) Histogram overlay */
+      const bins = 25;
+      const allMag = [...o.mag, ...c.mag];
+      const minM = Math.min(...allMag), maxM = Math.max(...allMag);
+      const binW = (maxM - minM) / bins;
+      const cntO = new Array(bins).fill(0), cntC = new Array(bins).fill(0);
+      o.mag.forEach(v => { let i=Math.floor((v-minM)/binW); if(i>=bins)i=bins-1; cntO[i]++; });
+      c.mag.forEach(v => { let i=Math.floor((v-minM)/binW); if(i>=bins)i=bins-1; cntC[i]++; });
+      const histLabels = cntO.map((_,i)=>(minM+(i+.5)*binW).toFixed(2));
+
+      charts.histOverlay = new Chart(document.getElementById('chartHistOverlay'), {
+        type: 'bar',
+        data: { labels: histLabels, datasets: [
+          { label: 'Eyes open', data: cntO, backgroundColor: 'rgba(41,128,185,.45)', borderRadius:2 },
+          { label: 'Eyes closed', data: cntC, backgroundColor: 'rgba(192,57,43,.45)', borderRadius:2 },
+        ]},
+        options: { ...base, scales: {
+          x: { title:{display:true,text:'Sway magnitude',font}, ticks:{maxTicksLimit:8,font:{size:9}} },
+          y: { title:{display:true,text:'Frequency',font}, ticks:{font:{size:10}} },
+        }}
+      });
+
+      /* 6) Delta plot */
+      const deltaN = N;
+      const dO = ds(o.mag.slice(0, minLen), deltaN);
+      const dC = ds(c.mag.slice(0, minLen), deltaN);
+      const deltaData = dC.map((v,i) => v - dO[i]);
+      const deltaLabels = ds(o.t.slice(0, minLen), deltaN).map(v => v.toFixed(1));
+
+      charts.delta = new Chart(document.getElementById('chartDelta'), {
+        type: 'bar',
+        data: { labels: deltaLabels, datasets: [{
+          data: deltaData,
+          backgroundColor: deltaData.map(v => v > 0 ? 'rgba(192,57,43,.5)' : 'rgba(41,128,185,.4)'),
+          borderWidth: 0,
+          barPercentage: 1.0, categoryPercentage: 1.0,
+        }]},
+        options: { ...base, plugins: { ...base.plugins, legend: { display: false } }, scales: {
+          x: { display: false },
+          y: { title:{display:true,text:'Δ sway (closed − open)',font}, ticks:{font:{size:10}} },
+        }}
+      });
+
+      setTimeout(() => analysisSection.scrollIntoView({ behavior:'smooth', block:'start' }), 120);
+    }
+  </script>
+</body>
+</html>
