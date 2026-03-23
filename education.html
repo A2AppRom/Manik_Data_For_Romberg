@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Romberger — Education</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,400;0,500;0,700;1,400&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #f5f3ef;
+      --surface: #ffffff;
+      --text: #1a1a1a;
+      --text-muted: #6b6560;
+      --accent: #2d5a3d;
+      --accent-light: #e8f0eb;
+      --border: #e0dbd5;
+      --radius: 14px;
+      --shadow: 0 2px 20px rgba(0, 0, 0, 0.04);
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1.25rem 2.5rem;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .logo {
+      font-family: 'Instrument Serif', serif;
+      font-size: 1.55rem;
+      letter-spacing: -0.02em;
+      color: var(--accent);
+      text-decoration: none;
+    }
+
+    .logo span {
+      font-style: italic;
+      opacity: 0.55;
+      font-weight: 400;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 2rem;
+    }
+
+    .nav-links a {
+      text-decoration: none;
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      font-weight: 500;
+      transition: color 0.2s;
+    }
+
+    .nav-links a:hover,
+    .nav-links a.active {
+      color: var(--accent);
+    }
+
+    section {
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 4rem 2rem;
+    }
+
+    .hero {
+      text-align: center;
+      padding: 5rem 2rem 2.5rem;
+    }
+
+    .hero h1 {
+      font-family: 'Instrument Serif', serif;
+      font-size: clamp(2.1rem, 5vw, 3.2rem);
+      font-weight: 400;
+      line-height: 1.12;
+      letter-spacing: -0.025em;
+      margin-bottom: 1rem;
+    }
+
+    .hero p {
+      color: var(--text-muted);
+      font-size: 1rem;
+      max-width: 680px;
+      margin: 0 auto;
+      line-height: 1.6;
+    }
+
+    .section-label {
+      text-transform: uppercase;
+      font-size: 0.72rem;
+      letter-spacing: 0.12em;
+      color: var(--accent);
+      font-weight: 700;
+      margin-bottom: 0.6rem;
+    }
+
+    .section-title {
+      font-family: 'Instrument Serif', serif;
+      font-size: 1.75rem;
+      font-weight: 400;
+      margin-bottom: 0.7rem;
+    }
+
+    .section-desc {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+      line-height: 1.6;
+      max-width: 700px;
+    }
+
+    .card-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 1.25rem;
+      margin-top: 1.5rem;
+    }
+
+    .info-card {
+      background: var(--surface);
+      border-radius: var(--radius);
+      padding: 1.7rem 1.45rem;
+      box-shadow: var(--shadow);
+      border: 1px solid #f0ece7;
+      transition: transform 0.2s;
+    }
+
+    .info-card:hover {
+      transform: translateY(-3px);
+    }
+
+    .info-card h3 {
+      font-family: 'Instrument Serif', serif;
+      font-size: 1.2rem;
+      margin-bottom: 0.55rem;
+    }
+
+    .info-card p {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      line-height: 1.6;
+    }
+
+    .note {
+      margin-top: 1.8rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 0.9rem 1rem;
+      color: var(--text-muted);
+      font-size: 0.82rem;
+      line-height: 1.5;
+    }
+
+    footer {
+      text-align: center;
+      padding: 2.5rem;
+      color: var(--text-muted);
+      font-size: 0.8rem;
+      border-top: 1px solid var(--border);
+      margin-top: 2rem;
+    }
+  </style>
+</head>
+<body>
+  <nav>
+    <a class="logo" href="index.html">Romberger <span>balance</span></a>
+    <div class="nav-links">
+      <a href="index.html#upload">Upload</a>
+      <a href="index.html#analysis">Analysis</a>
+      <a href="education.html" class="active">Education</a>
+      <a href="index.html#about">About</a>
+    </div>
+  </nav>
+
+  <section class="hero">
+    <h1>Balance, explained</h1>
+    <p>This page contains the educational background for your recordings: what balance is, what loss of balance means, and how the Romberg test is interpreted.</p>
+  </section>
+
+  <section>
+    <p class="section-label">Education</p>
+    <h2 class="section-title">Core concepts behind the test</h2>
+    <p class="section-desc">Use this as a quick reference while comparing eyes-open and eyes-closed trials in Romberger.</p>
+
+    <div class="card-grid">
+      <article class="info-card">
+        <h3>What is balance?</h3>
+        <p>Balance is the body's ability to keep its center of mass over its base of support. It depends on three systems working together: visual input, vestibular input from the inner ear, and proprioception from muscles and joints.</p>
+      </article>
+
+      <article class="info-card">
+        <h3>What is loss of balance?</h3>
+        <p>Loss of balance happens when those systems cannot coordinate effectively. You may see larger sway, delayed corrective movements, or sudden instability. Fatigue, sensory deficits, medication effects, and neurologic issues can all contribute.</p>
+      </article>
+
+      <article class="info-card">
+        <h3>About the Romberg test</h3>
+        <p>The Romberg test compares stability with eyes open versus eyes closed. If sway increases notably with eyes closed, it suggests stronger reliance on visual input and possible proprioceptive impairment. The test is useful for screening, but by itself is not diagnostic.</p>
+      </article>
+    </div>
+
+    <p class="note">Educational use only: this website is not a medical device and does not provide diagnosis.</p>
+  </section>
+
+  <footer><p>Romberger — an educational balance exploration tool. Not intended for clinical use.</p></footer>
+</body>
+</html>
