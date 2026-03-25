@@ -314,6 +314,66 @@
 
     /* ---- FOOTER ---- */
     footer { text-align: center; padding: 2.5rem; color: var(--text-muted); font-size: .8rem; border-top: 1px solid var(--border); }
+
+    /* ---- SESSION META FORM ---- */
+    .session-meta-form {
+      display: flex; gap: 1rem; align-items: flex-end; flex-wrap: wrap;
+      background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 1.25rem 1.5rem; margin-top: 1.25rem;
+    }
+    .session-meta-form .meta-label {
+      font-size: .75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .1em;
+      color: var(--accent); margin-bottom: .85rem;
+      flex-basis: 100%;
+    }
+    .meta-field { display: flex; flex-direction: column; gap: .35rem; min-width: 160px; }
+    .meta-field label { font-size: .8rem; font-weight: 600; color: var(--text-muted); }
+    .meta-field input, .meta-field select {
+      padding: .55rem .85rem; border: 1px solid var(--border); border-radius: 8px;
+      font-family: 'DM Sans', sans-serif; font-size: .9rem; background: var(--bg);
+      color: var(--text); outline: none; transition: border-color .2s;
+    }
+    .meta-field input:focus, .meta-field select:focus { border-color: var(--accent); }
+
+    /* ---- ADD TO DATASET ROW ---- */
+    .add-dataset-row {
+      display: flex; align-items: center; gap: 1rem; justify-content: flex-start;
+      margin-top: 1.5rem; padding-top: 1.25rem; border-top: 1px solid var(--border);
+    }
+    .btn-secondary {
+      display: inline-block; background: transparent; color: var(--accent);
+      padding: .7rem 1.6rem; border-radius: 99px;
+      font-weight: 600; font-size: .88rem; border: 1.5px solid var(--accent); cursor: pointer;
+      transition: background .15s, color .15s;
+    }
+    .btn-secondary:hover { background: var(--accent-light); }
+    .btn-secondary:disabled { opacity: .4; pointer-events: none; }
+    .btn-danger {
+      display: inline-block; background: transparent; color: #c0392b;
+      padding: .7rem 1.6rem; border-radius: 99px;
+      font-weight: 600; font-size: .88rem; border: 1.5px solid #c0392b; cursor: pointer;
+      transition: background .15s;
+    }
+    .btn-danger:hover { background: rgba(192,57,43,.08); }
+    .add-status { font-size: .85rem; color: var(--text-muted); }
+
+    /* ---- DATASET SECTION ---- */
+    .dataset-header-row {
+      display: flex; align-items: center; justify-content: space-between;
+      flex-wrap: wrap; gap: 1rem; margin-bottom: 1.5rem;
+    }
+    .dataset-count-badge {
+      display: inline-flex; align-items: center; gap: .5rem;
+      background: var(--accent-light); color: var(--accent);
+      padding: .3rem .85rem; border-radius: 99px; font-size: .82rem; font-weight: 700;
+    }
+    .dataset-actions { display: flex; gap: .75rem; flex-wrap: wrap; }
+    .dataset-table-wrap { overflow-x: auto; border-radius: var(--radius); border: 1px solid var(--border); margin-bottom: 1rem; }
+    .dataset-empty {
+      text-align: center; padding: 3rem 1rem; color: var(--text-muted); font-size: .95rem;
+      background: var(--surface); border: 1px dashed var(--border); border-radius: var(--radius);
+    }
+    .dataset-empty strong { display: block; font-size: 1rem; color: var(--text); margin-bottom: .4rem; }
   </style>
 </head>
 <body>
@@ -323,6 +383,7 @@
     <div class="nav-links">
       <a href="#upload">Upload</a>
       <a href="#analysis">Analysis</a>
+      <a href="#dataset">Dataset</a>
       <a href="#learn">Learn</a>
       <a href="#about">About</a>
     </div>
@@ -387,6 +448,22 @@
       <div class="preview-footer" id="prevFooter">—</div>
     </div>
 
+    <div class="session-meta-form">
+      <div class="meta-label">Session info (for dataset export)</div>
+      <div class="meta-field">
+        <label for="subjectId">Subject ID</label>
+        <input type="text" id="subjectId" placeholder="e.g. S001" maxlength="20">
+      </div>
+      <div class="meta-field">
+        <label for="sessionLabel">Label</label>
+        <select id="sessionLabel">
+          <option value="unknown">Unknown</option>
+          <option value="stable">Stable</option>
+          <option value="impaired">Impaired</option>
+        </select>
+      </div>
+    </div>
+
     <div class="analyze-row">
       <button class="btn-primary" id="btnAnalyze" disabled>Compare both recordings</button>
     </div>
@@ -403,6 +480,12 @@
 
     <!-- Dynamic Insights -->
     <div class="insights-panel" id="insightsPanel"></div>
+
+    <!-- Add to Dataset -->
+    <div class="add-dataset-row" id="addDatasetRow" style="display:none">
+      <button class="btn-secondary" id="btnAddToDataset">+ Add session to dataset</button>
+      <span class="add-status" id="addStatus"></span>
+    </div>
 
     <div class="charts-grid">
       <!-- Overlay: sway magnitude -->
@@ -466,6 +549,26 @@
     </div>
   </section>
 
+  <!-- ============ DATASET ============ -->
+  <section id="dataset">
+    <p class="section-label">ML Training Data</p>
+    <h2 class="section-title">Session dataset</h2>
+    <p class="section-desc">Each analyzed session can be saved here as a labeled feature row. Accumulate recordings across subjects and export the CSV to train your model.</p>
+    <div class="dataset-header-row">
+      <span class="dataset-count-badge" id="datasetCountBadge">0 sessions</span>
+      <div class="dataset-actions">
+        <button class="btn-secondary" id="btnDownloadDataset">Download CSV</button>
+        <button class="btn-danger" id="btnClearDataset">Clear dataset</button>
+      </div>
+    </div>
+    <div id="datasetTableContainer">
+      <div class="dataset-empty">
+        <strong>No sessions yet</strong>
+        Upload and analyze a recording pair, then click "Add session to dataset" above.
+      </div>
+    </div>
+  </section>
+
   <!-- Modal -->
   <div class="modal-overlay" id="modal">
     <div class="modal-content">
@@ -510,6 +613,8 @@
     const state = { open: null, closed: null };   // { name, size, headers, rows, trimmed:{t,x,y,z,mag} }
     let activePreview = 'open';
     let charts = {};
+    let dataset = JSON.parse(localStorage.getItem('romberg_dataset') || '[]');
+    let lastSessionFeatures = null;  // populated after each runAnalysis()
 
     /* ==========================================================
        DOM
@@ -532,6 +637,15 @@
     const modalNameEl   = document.getElementById('modalName');
     const modalMetaEl   = document.getElementById('modalMeta');
     const btnCloseModal = document.getElementById('btnCloseModal');
+    const subjectIdInput   = document.getElementById('subjectId');
+    const sessionLabelSel  = document.getElementById('sessionLabel');
+    const addDatasetRow    = document.getElementById('addDatasetRow');
+    const btnAddToDataset  = document.getElementById('btnAddToDataset');
+    const addStatus        = document.getElementById('addStatus');
+    const datasetTableContainer = document.getElementById('datasetTableContainer');
+    const datasetCountBadge = document.getElementById('datasetCountBadge');
+    const btnDownloadDataset = document.getElementById('btnDownloadDataset');
+    const btnClearDataset  = document.getElementById('btnClearDataset');
 
     /* ==========================================================
        UTILS
@@ -885,6 +999,26 @@
       insightsEl.innerHTML = insHTML;
       insightsEl.classList.add('visible');
 
+      /* --- Store features for dataset export --- */
+      lastSessionFeatures = {
+        rms_open: so.rms, rms_closed: sc.rms,
+        peak_open: so.peak, peak_closed: sc.peak,
+        std_open: so.std, std_closed: sc.std,
+        jerk_open: so.jerk, jerk_closed: sc.jerk,
+        path_open: so.path, path_closed: sc.path,
+        sway_area_open: areaO, sway_area_closed: areaC,
+        romberg_quotient: rombergQ,
+        rms_pct_change: rmsPctChange,
+        area_pct_change: areaPctChange,
+        path_pct_change: pathPctChange,
+        jerk_pct_change: jerkPctChange,
+        dur_open: so.dur, dur_closed: sc.dur,
+        n_open: so.n, n_closed: sc.n,
+      };
+      addDatasetRow.style.display = 'flex';
+      addStatus.textContent = '';
+      btnAddToDataset.disabled = false;
+
       /* --- Common setup --- */
       const font = { family: 'DM Sans' };
       const N = 500;
@@ -1036,6 +1170,101 @@
 
       setTimeout(() => analysisSection.scrollIntoView({ behavior:'smooth', block:'start' }), 120);
     }
+
+    /* ==========================================================
+       DATASET FUNCTIONS
+    ========================================================== */
+    const DATASET_COLS = [
+      'subject_id','label',
+      'rms_open','rms_closed','peak_open','peak_closed',
+      'std_open','std_closed','jerk_open','jerk_closed',
+      'path_open','path_closed','sway_area_open','sway_area_closed',
+      'romberg_quotient','rms_pct_change','area_pct_change','path_pct_change','jerk_pct_change',
+      'dur_open','dur_closed','n_open','n_closed',
+    ];
+
+    function saveDataset() {
+      localStorage.setItem('romberg_dataset', JSON.stringify(dataset));
+    }
+
+    function renderDataset() {
+      const count = dataset.length;
+      datasetCountBadge.textContent = count === 1 ? '1 session' : `${count} sessions`;
+      btnDownloadDataset.disabled = count === 0;
+      btnClearDataset.disabled = count === 0;
+
+      if (count === 0) {
+        datasetTableContainer.innerHTML = `<div class="dataset-empty"><strong>No sessions yet</strong>Upload and analyze a recording pair, then click "+ Add session to dataset" above.</div>`;
+        return;
+      }
+
+      // Show a preview table with key columns
+      const previewCols = ['subject_id','label','romberg_quotient','rms_open','rms_closed','path_open','path_closed','sway_area_open','sway_area_closed','rms_pct_change'];
+      let html = `<div class="dataset-table-wrap"><table class="csv-table"><thead><tr>`;
+      previewCols.forEach(c => { html += `<th>${esc(c)}</th>`; });
+      html += `</tr></thead><tbody>`;
+      dataset.forEach(row => {
+        html += `<tr>`;
+        previewCols.forEach(c => {
+          const v = row[c];
+          html += `<td>${typeof v === 'number' ? v.toFixed(4) : esc(String(v ?? ''))}</td>`;
+        });
+        html += `</tr>`;
+      });
+      html += `</tbody></table></div>`;
+      if (count > 5) {
+        html += `<p style="font-size:.8rem;color:var(--text-muted);margin-top:.5rem">Showing all ${count} rows · Download CSV for full feature matrix</p>`;
+      }
+      datasetTableContainer.innerHTML = html;
+    }
+
+    btnAddToDataset.addEventListener('click', () => {
+      if (!lastSessionFeatures) return;
+      const sid = subjectIdInput.value.trim();
+      if (!sid) {
+        subjectIdInput.focus();
+        addStatus.textContent = 'Enter a Subject ID first.';
+        addStatus.style.color = '#c0392b';
+        return;
+      }
+      const row = {
+        subject_id: sid,
+        label: sessionLabelSel.value,
+        ...lastSessionFeatures,
+      };
+      dataset.push(row);
+      saveDataset();
+      renderDataset();
+      addStatus.textContent = `Session added (${dataset.length} total).`;
+      addStatus.style.color = 'var(--accent)';
+      btnAddToDataset.disabled = true;
+    });
+
+    btnDownloadDataset.addEventListener('click', () => {
+      if (dataset.length === 0) return;
+      const rows = [DATASET_COLS.join(',')];
+      dataset.forEach(row => {
+        rows.push(DATASET_COLS.map(c => {
+          const v = row[c] ?? '';
+          return typeof v === 'string' ? `"${v.replace(/"/g,'""')}"` : v;
+        }).join(','));
+      });
+      const blob = new Blob([rows.join('\n')], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = 'romberg_dataset.csv'; a.click();
+      URL.revokeObjectURL(url);
+    });
+
+    btnClearDataset.addEventListener('click', () => {
+      if (!confirm(`Clear all ${dataset.length} session(s)? This cannot be undone.`)) return;
+      dataset = [];
+      saveDataset();
+      renderDataset();
+    });
+
+    // Initial render on page load
+    renderDataset();
   </script>
 </body>
 </html>
