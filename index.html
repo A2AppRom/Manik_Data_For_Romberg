@@ -1,0 +1,854 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Romberger — Posture Classification</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,400;0,500;0,700;1,400&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg: #f5f3ef;
+      --surface: #ffffff;
+      --text: #1a1a1a;
+      --text-muted: #6b6560;
+      --accent: #2d5a3d;
+      --accent-light: #e8f0eb;
+      --border: #e0dbd5;
+      --radius: 14px;
+      --shadow: 0 2px 20px rgba(0,0,0,0.04);
+      --standing-color: #2980b9;
+      --sitting-color: #c0392b;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--bg); color: var(--text);
+      min-height: 100vh; -webkit-font-smoothing: antialiased;
+    }
+
+    /* Nav */
+    nav {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 1.25rem 2.5rem; border-bottom: 1px solid var(--border);
+      background: var(--surface); position: sticky; top: 0; z-index: 100;
+    }
+    .logo { font-family: 'Instrument Serif', serif; font-size: 1.55rem; letter-spacing: -0.02em; color: var(--accent); }
+    .logo span { font-style: italic; opacity: .55; font-weight: 400; }
+    .nav-links { display: flex; gap: 2rem; }
+    .nav-links a { text-decoration: none; color: var(--text-muted); font-size: 0.9rem; font-weight: 500; transition: color .2s; }
+    .nav-links a:hover { color: var(--accent); }
+
+    /* Sections */
+    section { max-width: 960px; margin: 0 auto; padding: 4rem 2rem; }
+    section + section { border-top: 1px solid var(--border); }
+    .section-label { text-transform: uppercase; font-size: .72rem; letter-spacing: .12em; color: var(--accent); font-weight: 700; margin-bottom: .6rem; }
+    .section-title { font-family: 'Instrument Serif', serif; font-size: 1.75rem; font-weight: 400; margin-bottom: .6rem; }
+    .section-desc { color: var(--text-muted); font-size: .95rem; line-height: 1.6; max-width: 600px; }
+
+    /* Hero */
+    .hero { text-align: center; padding: 5rem 2rem 3.5rem; }
+    .hero h1 {
+      font-family: 'Instrument Serif', serif;
+      font-size: clamp(2.2rem, 5vw, 3.4rem);
+      font-weight: 400; line-height: 1.15; letter-spacing: -0.025em; margin-bottom: 1.25rem;
+    }
+    .hero p { color: var(--text-muted); font-size: 1.02rem; max-width: 600px; margin: 0 auto 2rem; line-height: 1.6; }
+
+    /* Cards & Grid */
+    .card { background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); padding: 1.5rem; }
+    .dataset-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-top: 1.5rem; }
+    @media (max-width: 640px) { .dataset-stats { grid-template-columns: repeat(2, 1fr); } }
+    .stat-card { background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); padding: 1.2rem; text-align: center; }
+    .stat-card .stat-num { font-family: 'Instrument Serif', serif; font-size: 1.8rem; color: var(--accent); }
+    .stat-card .stat-lbl { font-size: .75rem; color: var(--text-muted); margin-top: .2rem; }
+
+    .charts-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-top: 1.5rem; }
+    @media (max-width: 700px) { .charts-row { grid-template-columns: 1fr; } }
+    .chart-card { background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); padding: 1.5rem; animation: fadeUp .45s ease; }
+    .chart-card h4 { font-family: 'Instrument Serif', serif; font-size: 1.1rem; margin-bottom: .2rem; }
+    .chart-card .chart-sub { font-size: .76rem; color: var(--text-muted); margin-bottom: 1rem; line-height: 1.4; }
+    .chart-card canvas { width: 100% !important; }
+    @keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* Accuracy */
+    .accuracy-card { background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); padding: 2rem; text-align: center; margin-top: 1.5rem; }
+    .accuracy-big { font-family: 'Instrument Serif', serif; font-size: 3.5rem; color: var(--accent); line-height: 1; }
+    .accuracy-label { font-size: .82rem; color: var(--text-muted); margin-top: .3rem; }
+
+    /* Confusion matrix */
+    .confusion-grid {
+      display: inline-grid; grid-template-columns: auto 1fr 1fr; grid-template-rows: auto 1fr 1fr;
+      gap: 2px; margin-top: 1rem; font-size: .85rem;
+    }
+    .confusion-grid .header { padding: .5rem 1.2rem; font-weight: 600; text-align: center; color: var(--text-muted); font-size: .75rem; text-transform: uppercase; }
+    .confusion-grid .cell { padding: 1rem 1.5rem; text-align: center; border-radius: 8px; font-family: 'Instrument Serif', serif; font-size: 1.3rem; }
+    .cell-correct { background: rgba(39,174,96,.12); color: #1a8a4a; }
+    .cell-incorrect { background: rgba(192,57,43,.08); color: #c0392b; }
+
+    /* Metrics table */
+    .metrics-table { width: 100%; border-collapse: collapse; font-size: .85rem; margin-top: 1rem; }
+    .metrics-table th { background: var(--bg); font-weight: 600; text-align: left; padding: .6rem 1rem; border-bottom: 1px solid var(--border); font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; color: var(--text-muted); }
+    .metrics-table td { padding: .55rem 1rem; border-bottom: 1px solid #f0ece7; font-variant-numeric: tabular-nums; }
+    .metrics-table tbody tr:hover { background: var(--accent-light); }
+
+    /* Upload zone */
+    .upload-zone {
+      background: var(--surface); border: 2px dashed var(--border); border-radius: var(--radius);
+      padding: 2.5rem 1.5rem; text-align: center; cursor: pointer;
+      transition: border-color .25s, background .25s, transform .15s;
+      max-width: 520px; margin: 1.5rem auto 0;
+    }
+    .upload-zone:hover, .upload-zone.drag-over { border-color: var(--accent); background: var(--accent-light); }
+    .upload-zone.drag-over { transform: scale(1.01); }
+    .zone-icon {
+      width: 48px; height: 48px; margin: 0 auto .8rem; border-radius: 50%;
+      background: var(--accent-light); display: flex; align-items: center; justify-content: center;
+    }
+    .zone-icon svg { stroke: var(--accent); width: 22px; height: 22px; }
+    .upload-zone h3 { font-size: 1rem; margin-bottom: .3rem; }
+    .upload-zone p { color: var(--text-muted); font-size: .82rem; line-height: 1.4; }
+
+    /* Prediction result */
+    .prediction-result { display: none; margin-top: 2rem; padding: 2rem; background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); text-align: center; animation: fadeUp .45s ease; }
+    .prediction-result.visible { display: block; }
+    .prediction-label { font-family: 'Instrument Serif', serif; font-size: 2.2rem; margin-bottom: .5rem; }
+    .prediction-confidence { font-size: .9rem; color: var(--text-muted); }
+    .prediction-features { margin-top: 1.5rem; text-align: left; max-width: 400px; margin-left: auto; margin-right: auto; }
+    .pred-feat-row { display: flex; justify-content: space-between; padding: .35rem 0; font-size: .82rem; }
+    .pred-feat-row + .pred-feat-row { border-top: 1px solid #f0ece7; }
+    .pred-feat-label { color: var(--text-muted); }
+    .pred-feat-val { font-weight: 600; font-variant-numeric: tabular-nums; }
+
+    /* Feature bars */
+    .feature-compare { margin-top: 1.5rem; }
+    .feat-bar-row { display: flex; align-items: center; gap: .8rem; margin-bottom: .8rem; }
+    .feat-bar-label { font-size: .78rem; width: 110px; text-align: right; color: var(--text-muted); flex-shrink: 0; }
+    .feat-bar-group { flex: 1; display: flex; flex-direction: column; gap: .25rem; }
+    .feat-bar-track { height: 14px; border-radius: 7px; background: var(--bg); overflow: hidden; position: relative; display: flex; align-items: center; }
+    .feat-bar-fill { height: 100%; border-radius: 7px; transition: width .6s ease; }
+    .feat-bar-fill.standing { background: rgba(41,128,185,.5); }
+    .feat-bar-fill.sitting { background: rgba(192,57,43,.5); }
+    .feat-bar-val { position: absolute; right: 6px; font-size: .62rem; font-weight: 600; color: var(--text); }
+
+    /* Info cards */
+    .card-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.2rem; margin-top: 1.5rem; }
+    @media (max-width: 700px) { .card-grid { grid-template-columns: 1fr; } }
+    .info-card { background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); padding: 1.5rem; }
+    .info-card h4 { font-family: 'Instrument Serif', serif; font-size: 1.05rem; margin-bottom: .5rem; }
+    .info-card p { font-size: .84rem; color: var(--text-muted); line-height: 1.55; }
+
+    /* Badge */
+    .badge { display: inline-flex; align-items: center; gap: .4rem; padding: .3rem .9rem; border-radius: 99px; font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; }
+    .badge-standing { background: rgba(41,128,185,.12); color: var(--standing-color); }
+    .badge-sitting { background: rgba(192,57,43,.12); color: var(--sitting-color); }
+
+    footer { text-align: center; padding: 2rem; font-size: .8rem; color: var(--text-muted); border-top: 1px solid var(--border); }
+
+    /* Model badge */
+    .model-badge {
+      display: inline-flex; align-items: center; gap: .5rem;
+      padding: .4rem 1rem; border-radius: 99px; font-size: .78rem;
+      background: var(--accent-light); color: var(--accent); font-weight: 600;
+      margin-top: .8rem;
+    }
+    .model-badge .dot { width: 8px; height: 8px; border-radius: 50%; background: #27ae60; }
+
+    /* Notebook viewer */
+    .nb-cell { margin-bottom: 1rem; }
+    .nb-cell-md {
+      background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow);
+      padding: 1.2rem 1.5rem; font-size: .9rem; line-height: 1.7; color: var(--text);
+    }
+    .nb-cell-md h1, .nb-cell-md h2, .nb-cell-md h3 {
+      font-family: 'Instrument Serif', serif; font-weight: 400; margin: .8rem 0 .4rem; line-height: 1.3;
+    }
+    .nb-cell-md h1 { font-size: 1.4rem; }
+    .nb-cell-md h2 { font-size: 1.2rem; color: var(--accent); }
+    .nb-cell-md h3 { font-size: 1.05rem; }
+    .nb-cell-md p { margin: .4rem 0; }
+    .nb-cell-md strong { color: var(--text); }
+    .nb-cell-md code { background: var(--bg); padding: .15rem .4rem; border-radius: 4px; font-size: .82rem; }
+    .nb-cell-md ul, .nb-cell-md ol { margin: .4rem 0 .4rem 1.4rem; }
+    .nb-cell-md li { margin: .15rem 0; }
+    .nb-cell-code {
+      background: #1e1e2e; border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow);
+    }
+    .nb-cell-code-header {
+      display: flex; align-items: center; gap: .5rem;
+      padding: .5rem 1rem; background: rgba(255,255,255,.05); border-bottom: 1px solid rgba(255,255,255,.08);
+      font-size: .68rem; color: rgba(255,255,255,.4); font-family: monospace;
+    }
+    .nb-cell-code-header .dot-r { width: 8px; height: 8px; border-radius: 50%; background: #f38ba8; }
+    .nb-cell-code-header .dot-y { width: 8px; height: 8px; border-radius: 50%; background: #f9e2af; }
+    .nb-cell-code-header .dot-g { width: 8px; height: 8px; border-radius: 50%; background: #a6e3a1; }
+    .nb-cell-code pre {
+      padding: 1rem 1.2rem; margin: 0; overflow-x: auto; font-size: .78rem; line-height: 1.6;
+      color: #cdd6f4; font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+      scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.1) transparent;
+    }
+    .nb-cell-code pre::-webkit-scrollbar { height: 5px; }
+    .nb-cell-code pre::-webkit-scrollbar-thumb { background: rgba(255,255,255,.15); border-radius: 3px; }
+    /* Syntax highlight tokens */
+    .tok-kw { color: #cba6f7; }   /* keyword */
+    .tok-fn { color: #89b4fa; }   /* function */
+    .tok-str { color: #a6e3a1; }  /* string */
+    .tok-num { color: #fab387; }  /* number */
+    .tok-cmt { color: #6c7086; font-style: italic; } /* comment */
+    .tok-op { color: #89dceb; }   /* operator/decorator */
+    .tok-cls { color: #f9e2af; }  /* class/type */
+
+    .nb-download-row {
+      display: flex; align-items: center; gap: 1rem; margin-bottom: 1.5rem;
+      padding: 1rem 1.2rem; background: var(--surface); border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+    .nb-download-row p { font-size: .85rem; color: var(--text-muted); flex: 1; }
+    .btn-secondary {
+      display: inline-flex; align-items: center; gap: .4rem;
+      background: var(--accent); color: #fff; padding: .55rem 1.2rem; border-radius: 99px;
+      text-decoration: none; font-weight: 600; font-size: .82rem; border: none; cursor: pointer;
+      transition: transform .15s, box-shadow .2s; white-space: nowrap;
+    }
+    .btn-secondary:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(45,90,61,.25); }
+    .btn-secondary svg { width: 14px; height: 14px; stroke: #fff; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  </style>
+</head>
+<body>
+
+<nav>
+  <div class="logo">Romberger <span>posture</span></div>
+  <div class="nav-links">
+    <a href="#dataset-section">Dataset</a>
+    <a href="#performance-section">Performance</a>
+    <a href="#pipeline-section">Pipeline</a>
+    <a href="#predict-section">Predict</a>
+    <a href="#learn">Learn</a>
+    <a href="#about">About</a>
+  </div>
+</nav>
+
+<!-- Hero -->
+<section class="hero">
+  <h1>Classify posture from<br>phone accelerometer data</h1>
+  <p>Trained on the MotionSense dataset, this classifier uses smartphone accelerometer readings to determine whether a person was <strong>standing</strong> or <strong>sitting</strong> during a recording.</p>
+  <a href="#predict-section" class="btn-primary" style="display:inline-block;background:var(--accent);color:#fff;padding:.8rem 2rem;border-radius:99px;text-decoration:none;font-weight:600;font-size:.92rem;transition:transform .15s,box-shadow .2s;margin-top:.5rem;">Try it with your data</a>
+</section>
+
+<!-- 1. Dataset Section -->
+<section id="dataset-section">
+  <p class="section-label">Dataset</p>
+  <h2 class="section-title">MotionSense training data</h2>
+  <p class="section-desc">The model was trained on the MotionSense dataset published by Malekzadeh et al. — accelerometer and gyroscope data collected from an iPhone 6s at 50 Hz, with 24 subjects performing various activities.</p>
+
+  <div class="dataset-stats" style="margin-top:1.5rem">
+    <div class="stat-card"><div class="stat-num">24</div><div class="stat-lbl">Subjects</div></div>
+    <div class="stat-card"><div class="stat-num">96</div><div class="stat-lbl">CSV files loaded</div></div>
+    <div class="stat-card"><div class="stat-num">50 Hz</div><div class="stat-lbl">Sampling rate</div></div>
+    <div class="stat-card"><div class="stat-num">12</div><div class="stat-lbl">Sensor columns</div></div>
+  </div>
+
+  <!-- Dataset details card -->
+  <div class="chart-card" style="margin-top:1.5rem">
+    <h4>Data structure</h4>
+    <p class="chart-sub">Each CSV contains 12 columns of device motion data. We use the 3 userAcceleration columns (x, y, z) for classification.</p>
+    <table class="metrics-table">
+      <thead><tr><th>Group</th><th>Columns</th><th>Used</th></tr></thead>
+      <tbody>
+        <tr><td>Attitude</td><td>attitude.roll, attitude.pitch, attitude.yaw</td><td style="color:var(--text-muted)">No</td></tr>
+        <tr><td>Gravity</td><td>gravity.x, gravity.y, gravity.z</td><td style="color:var(--text-muted)">No</td></tr>
+        <tr><td>Rotation Rate</td><td>rotationRate.x, rotationRate.y, rotationRate.z</td><td style="color:var(--text-muted)">No</td></tr>
+        <tr><td style="font-weight:600;color:var(--accent)">User Acceleration</td><td style="font-weight:600">userAcceleration.x, .y, .z</td><td style="font-weight:600;color:var(--accent)">Yes</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Trials breakdown -->
+  <div class="charts-row" style="margin-top:1.5rem">
+    <div class="chart-card">
+      <h4>Activity trials used</h4>
+      <p class="chart-sub">4 trials from 2 activities, 24 subjects each</p>
+      <table class="metrics-table">
+        <thead><tr><th>Trial</th><th>Activity</th><th>Subjects</th><th>~Duration</th></tr></thead>
+        <tbody>
+          <tr><td><span class="badge badge-standing">std_6</span></td><td>Standing</td><td>24</td><td>~200s</td></tr>
+          <tr><td><span class="badge badge-standing">std_14</span></td><td>Standing</td><td>24</td><td>~50s</td></tr>
+          <tr><td><span class="badge badge-sitting">sit_5</span></td><td>Sitting</td><td>24</td><td>~200s</td></tr>
+          <tr><td><span class="badge badge-sitting">sit_13</span></td><td>Sitting</td><td>24</td><td>~200s</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="chart-card">
+      <h4>Windowing &amp; features</h4>
+      <p class="chart-sub">How raw data becomes model input</p>
+      <div style="font-size:.84rem;color:var(--text-muted);line-height:1.7">
+        <p><strong style="color:var(--text)">1. Segment</strong> each file into 30-second windows (1500 samples) with 50% overlap</p>
+        <p style="margin-top:.5rem"><strong style="color:var(--text)">2. Extract</strong> 8 statistical features per window:</p>
+        <ul style="margin:.4rem 0 .5rem 1.2rem">
+          <li>RMS sway (magnitude intensity)</li>
+          <li>Std dev X, Y, Z (directional variability)</li>
+          <li>Mean jerk (movement smoothness)</li>
+          <li>Path length (total displacement)</li>
+          <li>Sway mean &amp; peak (magnitude stats)</li>
+        </ul>
+        <p><strong style="color:var(--text)">3. Classify</strong> with logistic regression</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Final sample counts -->
+  <div class="dataset-stats" style="margin-top:1.5rem">
+    <div class="stat-card"><div class="stat-num">812</div><div class="stat-lbl">Total windows</div></div>
+    <div class="stat-card"><div class="stat-num">386</div><div class="stat-lbl">Standing windows</div></div>
+    <div class="stat-card"><div class="stat-num">426</div><div class="stat-lbl">Sitting windows</div></div>
+    <div class="stat-card"><div class="stat-num">8</div><div class="stat-lbl">Features extracted</div></div>
+  </div>
+
+  <!-- Subject demographics chart -->
+  <div class="chart-card" style="margin-top:1.5rem">
+    <h4>Subject demographics</h4>
+    <p class="chart-sub">24 subjects aged 18-46, varied height and weight, 14 male / 10 female</p>
+    <canvas id="demographicsChart" height="180"></canvas>
+  </div>
+</section>
+
+<!-- 2. Performance Section -->
+<section id="performance-section">
+  <p class="section-label">Performance</p>
+  <h2 class="section-title">Model evaluation</h2>
+  <p class="section-desc">Logistic regression evaluated with leave-one-subject-out cross-validation — the model never sees data from the test subject during training.</p>
+
+  <!-- Accuracy -->
+  <div class="accuracy-card">
+    <div class="accuracy-big">91.5%</div>
+    <div class="accuracy-label">Leave-one-subject-out cross-validation accuracy</div>
+  </div>
+
+  <!-- Confusion matrix + metrics -->
+  <div class="charts-row" style="margin-top:1.5rem">
+    <div class="chart-card" style="text-align:center">
+      <h4>Confusion matrix</h4>
+      <p class="chart-sub">Predicted vs actual across all 24 CV folds</p>
+      <div class="confusion-grid">
+        <div></div>
+        <div class="header">Pred. Sitting</div>
+        <div class="header">Pred. Standing</div>
+        <div class="header" style="text-align:right">Actual Sitting</div>
+        <div class="cell cell-correct">394</div>
+        <div class="cell cell-incorrect">32</div>
+        <div class="header" style="text-align:right">Actual Standing</div>
+        <div class="cell cell-incorrect">37</div>
+        <div class="cell cell-correct">349</div>
+      </div>
+    </div>
+    <div class="chart-card">
+      <h4>Classification metrics</h4>
+      <p class="chart-sub">Per-class precision, recall, and F1 score</p>
+      <table class="metrics-table">
+        <thead><tr><th>Class</th><th>Precision</th><th>Recall</th><th>F1</th></tr></thead>
+        <tbody>
+          <tr><td><span class="badge badge-sitting">Sitting</span></td><td>91.4%</td><td>92.5%</td><td>92.0%</td></tr>
+          <tr><td><span class="badge badge-standing">Standing</span></td><td>91.6%</td><td>90.4%</td><td>91.0%</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Per-subject chart -->
+  <div class="chart-card" style="margin-top:1.5rem">
+    <h4>Per-subject classification accuracy</h4>
+    <p class="chart-sub">Each bar shows accuracy when that subject was held out as the test set</p>
+    <canvas id="perSubjectChart" height="200"></canvas>
+  </div>
+
+  <!-- Feature importance -->
+  <div class="chart-card" style="margin-top:1.5rem">
+    <h4>Feature importance</h4>
+    <p class="chart-sub">Absolute logistic regression coefficient — higher means more influential for the classification decision</p>
+    <canvas id="featureImportanceChart" height="200"></canvas>
+  </div>
+</section>
+
+<!-- 3. Pipeline Section (Notebook Viewer) -->
+<section id="pipeline-section">
+  <p class="section-label">Pipeline</p>
+  <h2 class="section-title">Training pipeline</h2>
+  <p class="section-desc">The complete Python notebook used to load data, extract features, train the model, and export weights. Download and run it yourself, or read through below.</p>
+
+  <div class="nb-download-row" style="margin-top:1.5rem">
+    <div>
+      <div style="font-weight:600;font-size:.9rem">train_model.ipynb</div>
+      <p>Jupyter notebook — requires Python 3, scikit-learn, pandas, numpy, matplotlib, seaborn</p>
+    </div>
+    <button class="btn-secondary" onclick="downloadNotebook()">
+      <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Download .ipynb
+    </button>
+  </div>
+
+  <div id="notebookCells"></div>
+</section>
+
+<!-- 4. Predict Section -->
+<section id="predict-section">
+  <p class="section-label">Predict</p>
+  <h2 class="section-title">Test it yourself</h2>
+  <p class="section-desc">Upload an accelerometer CSV from Sensor Logger or any recording app. The model will extract the same 8 features and predict what you were doing — standing or sitting.</p>
+
+  <div class="upload-zone" id="predictZone">
+    <div class="zone-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+      </svg>
+    </div>
+    <h3>Drop your accelerometer CSV here</h3>
+    <p>Accepts CSV with columns: userAcceleration.x/y/z, or x/y/z, or accelerometerAccelerationX/Y/Z</p>
+  </div>
+  <input type="file" id="predictFile" accept=".csv" style="display:none">
+  <div class="prediction-result" id="predictionResult"></div>
+</section>
+
+<!-- Learn -->
+<section id="learn">
+  <p class="section-label">Learn</p>
+  <h2 class="section-title">Understanding posture recognition</h2>
+  <p class="section-desc">How phone accelerometers and simple machine learning distinguish standing from sitting.</p>
+  <div class="card-grid">
+    <div class="info-card">
+      <h4>Why accelerometers?</h4>
+      <p>Modern smartphones contain 3-axis accelerometers sampling at 50-100 Hz. Standing requires constant micro-adjustments for balance (postural sway), producing higher acceleration variance than the relative stillness of sitting.</p>
+    </div>
+    <div class="info-card">
+      <h4>Feature engineering</h4>
+      <p>Raw acceleration is noisy. We compute 8 statistical features per 30-second window: RMS sway (overall intensity), std dev per axis (directional patterns), mean jerk (movement smoothness), path length, and sway magnitude (mean and peak).</p>
+    </div>
+    <div class="info-card">
+      <h4>The Romberg test</h4>
+      <p>The Romberg test is a clinical exam where patients stand with eyes open then closed. Increased sway with eyes closed suggests impaired proprioception. Our posture classifier is a first step toward digitizing this assessment.</p>
+    </div>
+  </div>
+  <div class="card-grid" style="margin-top: 1.2rem;">
+    <div class="info-card">
+      <h4>What is balance?</h4>
+      <p>Balance relies on three sensory systems: vision, the vestibular apparatus (inner ear), and proprioception (body position sense). The brain integrates all three to maintain upright posture.</p>
+    </div>
+    <div class="info-card">
+      <h4>Loss of balance</h4>
+      <p>Impaired balance can result from neurological conditions, inner ear disorders, fatigue, or injury. Even closing your eyes removes visual feedback and increases postural sway in healthy individuals.</p>
+    </div>
+    <div class="info-card">
+      <h4>MotionSense dataset</h4>
+      <p>Published by Malekzadeh et al., this dataset collected iPhone 6s motion data from 24 diverse subjects (ages 18-46) across 6 activities. We use the standing and sitting trials for binary classification.</p>
+    </div>
+  </div>
+</section>
+
+<!-- About -->
+<section id="about">
+  <p class="section-label">About</p>
+  <h2 class="section-title">What is Romberger?</h2>
+  <p class="section-desc" style="max-width:700px">Romberger is an educational tool for exploring posture classification using smartphone accelerometer data. A logistic regression model was trained on the MotionSense dataset in Python (scikit-learn), and its weights are embedded directly in this page. Upload your own sensor recording and get a prediction instantly — everything runs client-side, no server needed. This is not intended for clinical use.</p>
+</section>
+
+<footer><p>Romberger — an educational posture classification tool. Not intended for clinical use.</p></footer>
+
+<script>
+/* ==========================================================
+   EMBEDDED MODEL WEIGHTS (from train_model.ipynb)
+========================================================== */
+const MODEL = {
+  feature_names: ["rms_sway","std_x","std_y","std_z","mean_jerk","path_length","sway_mean","sway_peak"],
+  scaler_mean: [0.04062466885371417,0.01576229271948646,0.0117773305984365,0.013878789467725316,0.47127935880935434,0.0094189608051622,0.03554346977997844,0.19872813428830458],
+  scaler_std: [0.029374773140715404,0.011415469705973598,0.008618544542422469,0.010213659213333353,0.2765017143599575,0.005525967038185564,0.02836371746808587,0.20877204094918658],
+  weights: [-0.898063726350462,4.834990857032956,-3.3728412485862567,3.1769723614722376,-0.5154483557159912,-0.5154772481874157,1.3270658877286143,-1.794945353482792],
+  bias: 0.5131258282752917,
+  classes: ["sitting","standing"],
+  per_subject_accuracy: [
+    {subject:1,accuracy:0.9524},{subject:2,accuracy:1.0},{subject:3,accuracy:0.9167},
+    {subject:4,accuracy:1.0},{subject:5,accuracy:1.0},{subject:6,accuracy:0.9697},
+    {subject:7,accuracy:0.9722},{subject:8,accuracy:0.9722},{subject:9,accuracy:1.0},
+    {subject:10,accuracy:0.9062},{subject:11,accuracy:1.0},{subject:12,accuracy:1.0},
+    {subject:13,accuracy:0.8378},{subject:14,accuracy:0.9722},{subject:15,accuracy:0.9167},
+    {subject:16,accuracy:0.8333},{subject:17,accuracy:1.0},{subject:18,accuracy:0.6774},
+    {subject:19,accuracy:0.6596},{subject:20,accuracy:0.7778},{subject:21,accuracy:0.8611},
+    {subject:22,accuracy:0.9688},{subject:23,accuracy:0.8696},{subject:24,accuracy:0.973}
+  ]
+};
+
+const SAMPLE_RATE = 50;
+const FEATURE_LABELS = {
+  rms_sway: 'RMS Sway', std_x: 'Std Dev X', std_y: 'Std Dev Y', std_z: 'Std Dev Z',
+  mean_jerk: 'Mean Jerk', path_length: 'Path Length', sway_mean: 'Sway Mean', sway_peak: 'Sway Peak',
+};
+
+/* ==========================================================
+   CSV PARSING
+========================================================== */
+function parseCSV(text) {
+  const lines = text.trim().split('\n');
+  const headers = lines[0].split(',').map(h => h.trim());
+  const rows = [];
+  for (let i = 1; i < lines.length; i++) {
+    const vals = lines[i].split(',');
+    if (vals.length === headers.length) {
+      const row = {};
+      headers.forEach((h, j) => row[h] = parseFloat(vals[j]));
+      rows.push(row);
+    }
+  }
+  return { headers, rows };
+}
+
+/* ==========================================================
+   FEATURE EXTRACTION (matches Python exactly)
+========================================================== */
+function extractFeatures(rows) {
+  let ax, ay, az;
+  if (rows[0].hasOwnProperty('userAcceleration.x')) {
+    ax = rows.map(r => r['userAcceleration.x']);
+    ay = rows.map(r => r['userAcceleration.y']);
+    az = rows.map(r => r['userAcceleration.z']);
+  } else if (rows[0].hasOwnProperty('x')) {
+    ax = rows.map(r => r['x']);
+    ay = rows.map(r => r['y']);
+    az = rows.map(r => r['z']);
+  } else {
+    // Try regex match for Sensor Logger columns
+    const keys = Object.keys(rows[0]);
+    const xCol = keys.find(k => /accel.*x/i.test(k));
+    const yCol = keys.find(k => /accel.*y/i.test(k));
+    const zCol = keys.find(k => /accel.*z/i.test(k));
+    if (xCol && yCol && zCol) {
+      ax = rows.map(r => r[xCol]);
+      ay = rows.map(r => r[yCol]);
+      az = rows.map(r => r[zCol]);
+    } else {
+      return null;
+    }
+  }
+
+  const n = ax.length;
+  if (n < 10) return null;
+
+  const mag = ax.map((x, i) => Math.sqrt(x*x + ay[i]*ay[i] + az[i]*az[i]));
+  const mean = arr => arr.reduce((s, v) => s + v, 0) / arr.length;
+  const std = arr => { const m = mean(arr); return Math.sqrt(arr.reduce((s, v) => s + (v - m)**2, 0) / arr.length); };
+
+  const jerk = [];
+  for (let i = 1; i < n; i++) {
+    const dx = ax[i]-ax[i-1], dy = ay[i]-ay[i-1], dz = az[i]-az[i-1];
+    jerk.push(Math.sqrt(dx*dx + dy*dy + dz*dz) * SAMPLE_RATE);
+  }
+
+  let pathLen = 0;
+  for (let i = 1; i < n; i++) {
+    pathLen += Math.sqrt((ax[i]-ax[i-1])**2 + (ay[i]-ay[i-1])**2 + (az[i]-az[i-1])**2);
+  }
+
+  return {
+    rms_sway: Math.sqrt(mag.reduce((s, v) => s + v*v, 0) / n),
+    std_x: std(ax),
+    std_y: std(ay),
+    std_z: std(az),
+    mean_jerk: mean(jerk),
+    path_length: pathLen / n,
+    sway_mean: mean(mag),
+    sway_peak: Math.max(...mag),
+  };
+}
+
+/* ==========================================================
+   PREDICTION (logistic regression with embedded weights)
+========================================================== */
+function predict(features) {
+  const { weights, bias, scaler_mean, scaler_std, feature_names, classes } = MODEL;
+  let z = bias;
+  for (let i = 0; i < feature_names.length; i++) {
+    const scaled = (features[feature_names[i]] - scaler_mean[i]) / scaler_std[i];
+    z += weights[i] * scaled;
+  }
+  const prob = 1 / (1 + Math.exp(-z)); // probability of classes[1] = "standing"
+  return {
+    label: prob > 0.5 ? 'standing' : 'sitting',
+    confidence: Math.max(prob, 1 - prob),
+    probStanding: prob,
+  };
+}
+
+/* ==========================================================
+   CHARTS (render on page load)
+========================================================== */
+// Per-subject accuracy
+const psData = MODEL.per_subject_accuracy;
+new Chart(document.getElementById('perSubjectChart').getContext('2d'), {
+  type: 'bar',
+  data: {
+    labels: psData.map(d => `Sub ${d.subject}`),
+    datasets: [{
+      label: 'Accuracy',
+      data: psData.map(d => +(d.accuracy * 100).toFixed(1)),
+      backgroundColor: psData.map(d =>
+        d.accuracy >= 0.8 ? 'rgba(45,90,61,0.6)' : d.accuracy >= 0.5 ? 'rgba(230,126,34,0.6)' : 'rgba(192,57,43,0.5)'
+      ),
+      borderRadius: 4,
+    }]
+  },
+  options: {
+    responsive: true,
+    plugins: { legend: { display: false } },
+    scales: {
+      y: { beginAtZero: true, max: 100, title: { display: true, text: 'Accuracy %', font: { family: 'DM Sans' } }, grid: { color: '#f0ece7' } },
+      x: { grid: { display: false }, ticks: { font: { size: 10 } } }
+    }
+  }
+});
+
+// Feature importance
+const absWeights = MODEL.weights.map(Math.abs);
+const sortedIdx = absWeights.map((v, i) => i).sort((a, b) => absWeights[a] - absWeights[b]);
+new Chart(document.getElementById('featureImportanceChart').getContext('2d'), {
+  type: 'bar',
+  data: {
+    labels: sortedIdx.map(i => FEATURE_LABELS[MODEL.feature_names[i]]),
+    datasets: [{
+      label: '|Coefficient|',
+      data: sortedIdx.map(i => +absWeights[i].toFixed(4)),
+      backgroundColor: 'rgba(45,90,61,0.6)',
+      borderRadius: 4,
+    }]
+  },
+  options: {
+    indexAxis: 'y',
+    responsive: true,
+    plugins: { legend: { display: false } },
+    scales: {
+      x: { title: { display: true, text: '|Weight|', font: { family: 'DM Sans' } }, grid: { color: '#f0ece7' } },
+      y: { grid: { display: false } }
+    }
+  }
+});
+
+// Subject demographics (from data_subjects_info.csv)
+const subjects = [
+  {id:1,weight:102,height:188,age:46,gender:'M'},{id:2,weight:72,height:180,age:28,gender:'M'},
+  {id:3,weight:48,height:161,age:28,gender:'F'},{id:4,weight:90,height:176,age:31,gender:'M'},
+  {id:5,weight:48,height:164,age:23,gender:'F'},{id:6,weight:76,height:180,age:28,gender:'M'},
+  {id:7,weight:62,height:175,age:30,gender:'F'},{id:8,weight:52,height:161,age:24,gender:'F'},
+  {id:9,weight:93,height:190,age:32,gender:'M'},{id:10,weight:72,height:164,age:31,gender:'F'},
+  {id:11,weight:70,height:178,age:24,gender:'M'},{id:12,weight:60,height:167,age:33,gender:'M'},
+  {id:13,weight:60,height:178,age:33,gender:'M'},{id:14,weight:70,height:180,age:35,gender:'M'},
+  {id:15,weight:70,height:185,age:33,gender:'M'},{id:16,weight:96,height:172,age:29,gender:'F'},
+  {id:17,weight:76,height:180,age:26,gender:'M'},{id:18,weight:54,height:164,age:26,gender:'F'},
+  {id:19,weight:78,height:164,age:28,gender:'F'},{id:20,weight:88,height:180,age:25,gender:'M'},
+  {id:21,weight:52,height:165,age:24,gender:'M'},{id:22,weight:100,height:186,age:31,gender:'M'},
+  {id:23,weight:68,height:170,age:25,gender:'F'},{id:24,weight:74,height:173,age:18,gender:'F'},
+];
+new Chart(document.getElementById('demographicsChart').getContext('2d'), {
+  type: 'scatter',
+  data: {
+    datasets: [{
+      label: 'Male',
+      data: subjects.filter(s => s.gender === 'M').map(s => ({ x: s.height, y: s.weight })),
+      backgroundColor: 'rgba(41,128,185,0.6)', borderColor: 'rgba(41,128,185,0.8)',
+      pointRadius: 6, pointHoverRadius: 8,
+    }, {
+      label: 'Female',
+      data: subjects.filter(s => s.gender === 'F').map(s => ({ x: s.height, y: s.weight })),
+      backgroundColor: 'rgba(192,57,43,0.5)', borderColor: 'rgba(192,57,43,0.8)',
+      pointRadius: 6, pointHoverRadius: 8,
+    }]
+  },
+  options: {
+    responsive: true,
+    plugins: { legend: { position: 'top', labels: { usePointStyle: true, font: { family: 'DM Sans', size: 11 } } } },
+    scales: {
+      x: { title: { display: true, text: 'Height (cm)', font: { family: 'DM Sans' } }, grid: { color: '#f0ece7' } },
+      y: { title: { display: true, text: 'Weight (kg)', font: { family: 'DM Sans' } }, grid: { color: '#f0ece7' } }
+    }
+  }
+});
+
+/* ==========================================================
+   FILE UPLOAD & PREDICTION
+========================================================== */
+const predictZone = document.getElementById('predictZone');
+const predictFile = document.getElementById('predictFile');
+
+predictZone.addEventListener('click', () => predictFile.click());
+predictZone.addEventListener('dragover', e => { e.preventDefault(); predictZone.classList.add('drag-over'); });
+predictZone.addEventListener('dragleave', () => predictZone.classList.remove('drag-over'));
+predictZone.addEventListener('drop', e => {
+  e.preventDefault();
+  predictZone.classList.remove('drag-over');
+  if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+});
+predictFile.addEventListener('change', () => {
+  if (predictFile.files.length) handleFile(predictFile.files[0]);
+});
+
+function handleFile(file) {
+  const reader = new FileReader();
+  reader.onload = () => {
+    const { rows } = parseCSV(reader.result);
+    if (rows.length < 10) {
+      alert('CSV has too few rows. Need at least 10 data rows.');
+      return;
+    }
+
+    const features = extractFeatures(rows);
+    if (!features) {
+      alert('Could not find acceleration columns. Expected: userAcceleration.x/y/z, or x/y/z, or accelerometerAccelerationX/Y/Z');
+      return;
+    }
+
+    const result = predict(features);
+    showPrediction(result, features, file.name, rows.length);
+  };
+  reader.readAsText(file);
+}
+
+function showPrediction(result, features, filename, sampleCount) {
+  const el = document.getElementById('predictionResult');
+  el.classList.add('visible');
+
+  const isStanding = result.label === 'standing';
+  const color = isStanding ? 'var(--standing-color)' : 'var(--sitting-color)';
+  const icon = isStanding ? '&#9650;' : '&#9660;';
+  const duration = (sampleCount / SAMPLE_RATE).toFixed(1);
+
+  let featHtml = '';
+  MODEL.feature_names.forEach(f => {
+    featHtml += `<div class="pred-feat-row"><span class="pred-feat-label">${FEATURE_LABELS[f]}</span><span class="pred-feat-val">${features[f].toFixed(5)}</span></div>`;
+  });
+
+  el.innerHTML = `
+    <div style="font-size:2rem;color:${color}">${icon}</div>
+    <div class="prediction-label" style="color:${color}">${result.label.toUpperCase()}</div>
+    <div class="prediction-confidence">
+      Confidence: ${(result.confidence * 100).toFixed(1)}% &nbsp;|&nbsp;
+      P(standing): ${(result.probStanding * 100).toFixed(1)}% &nbsp;|&nbsp;
+      ${filename} &nbsp;|&nbsp; ${sampleCount} samples (~${duration}s)
+    </div>
+    <div class="prediction-features">
+      <h4 style="font-family:'Instrument Serif',serif;font-size:1rem;margin-bottom:.5rem">Extracted features</h4>
+      ${featHtml}
+    </div>
+  `;
+}
+
+/* ==========================================================
+   NOTEBOOK DOWNLOAD
+========================================================== */
+function downloadNotebook() {
+  fetch('train_model.ipynb')
+    .then(r => r.blob())
+    .then(blob => {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'train_model.ipynb';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    })
+    .catch(() => {
+      alert('Could not fetch the notebook file. If opening from file://, please download it manually from the project folder.');
+    });
+}
+
+/* ==========================================================
+   NOTEBOOK RENDERER — reads actual .ipynb file
+========================================================== */
+function renderNotebook(nb) {
+  const container = document.getElementById('notebookCells');
+  container.innerHTML = '';
+  let codeIdx = 0;
+  nb.cells.forEach(cell => {
+    const div = document.createElement('div');
+    div.className = 'nb-cell';
+    if (cell.cell_type === 'markdown') {
+      const src = (Array.isArray(cell.source) ? cell.source.join('') : cell.source);
+      div.innerHTML = '<div class="nb-cell-md">' + mdToHtml(src) + '</div>';
+    } else if (cell.cell_type === 'code') {
+      codeIdx++;
+      const src = (Array.isArray(cell.source) ? cell.source.join('') : cell.source);
+      div.innerHTML =
+        '<div class="nb-cell-code">' +
+          '<div class="nb-cell-code-header">' +
+            '<span class="dot-r"></span><span class="dot-y"></span><span class="dot-g"></span>' +
+            '<span style="margin-left:.3rem">In [' + codeIdx + ']</span>' +
+          '</div>' +
+          '<pre>' + highlightPython(src) + '</pre>' +
+        '</div>';
+    }
+    container.appendChild(div);
+  });
+}
+
+function mdToHtml(md) {
+  return md.split('\n').map(line => {
+    if (/^### /.test(line)) return '<h3>' + inlineMd(line.slice(4)) + '</h3>';
+    if (/^## /.test(line)) return '<h2>' + inlineMd(line.slice(3)) + '</h2>';
+    if (/^# /.test(line)) return '<h1>' + inlineMd(line.slice(2)) + '</h1>';
+    if (/^- /.test(line)) return '<ul><li>' + inlineMd(line.slice(2)) + '</li></ul>';
+    if (line.trim() === '') return '';
+    return '<p>' + inlineMd(line) + '</p>';
+  }).join('\n').replace(/<\/ul>\n<ul>/g, '\n');
+}
+function inlineMd(s) {
+  return s
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*([^*]+)\*/g, '<em>$1</em>');
+}
+
+function highlightPython(code) {
+  const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  return esc(code)
+    .replace(/(#.*?)$/gm, '<span class="tok-cmt">$1</span>')
+    .replace(/("""[\s\S]*?"""|'''[\s\S]*?''')/g, '<span class="tok-str">$1</span>')
+    .replace(/(f?'[^'\\]*(?:\\.[^'\\]*)*'|f?"[^"\\]*(?:\\.[^"\\]*)*")/g, '<span class="tok-str">$1</span>')
+    .replace(/(@\w+)/g, '<span class="tok-op">$1</span>')
+    .replace(/\b(import|from|as|def|class|return|if|elif|else|for|while|in|not|and|or|is|with|try|except|raise|pass|break|continue|None|True|False|print|lambda|yield|assert|global|del)\b/g, '<span class="tok-kw">$1</span>')
+    .replace(/\b(\d+\.?\d*(?:e[+-]?\d+)?)\b/g, '<span class="tok-num">$1</span>')
+    .replace(/\b([a-zA-Z_]\w*)\s*(?=\()/g, '<span class="tok-fn">$1</span>');
+}
+
+// Try fetch (works with local server), fall back to file input
+fetch('train_model.ipynb')
+  .then(r => { if (!r.ok) throw new Error(); return r.json(); })
+  .then(nb => renderNotebook(nb))
+  .catch(() => {
+    // Show a file picker fallback for file:// protocol
+    const container = document.getElementById('notebookCells');
+    container.innerHTML =
+      '<div class="nb-download-row">' +
+        '<div>' +
+          '<div style="font-weight:600;font-size:.9rem">Can\'t auto-load notebook</div>' +
+          '<p>When opening via file://, the browser can\'t read other files. Click below to view it inline, or download the .ipynb above to run in Jupyter.</p>' +
+        '</div>' +
+        '<label class="btn-secondary" style="cursor:pointer">' +
+          '<svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="15" x2="12" y2="3"/></svg>' +
+          'Load .ipynb' +
+          '<input type="file" accept=".ipynb" style="display:none" id="nbFileInput">' +
+        '</label>' +
+      '</div>';
+    document.getElementById('nbFileInput').addEventListener('change', function() {
+      if (this.files.length) {
+        const reader = new FileReader();
+        reader.onload = () => {
+          try {
+            renderNotebook(JSON.parse(reader.result));
+          } catch(e) {
+            container.innerHTML = '<p style="color:var(--sitting-color)">Error parsing notebook: ' + e.message + '</p>';
+          }
+        };
+        reader.readAsText(this.files[0]);
+      }
+    });
+  });
+</script>
+</body>
+</html>
