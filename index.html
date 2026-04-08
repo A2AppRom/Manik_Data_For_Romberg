@@ -458,14 +458,22 @@ const SUPABASE_URL = 'https://xmxyschvrqcqhqznjdgu.supabase.co'
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhteHlzY2h2cnFjcWhxem5qZGd1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ0NzEzNTgsImV4cCI6MjA5MDA0NzM1OH0.0odYckxFFkZhBaSxA6HB_p7VU1iUCGOeKmlbaR1EDZ4'
 const SUPABASE_TABLE = 'samples'
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY)
-async function saveToSupabase(features, result, filename) {
+async function saveToSupabase(features, result, filename, rawCsvText) {
+  const sampleId = crypto.randomUUID();
+
+  const { error: uploadError } = await sb.storage
+    .from('csv-uploads')
+    .upload(`${sampleId}/${filename}`, new Blob([rawCsvText], { type: 'text/csv' }));
+  if (uploadError) console.error('Storage upload failed:', uploadError.message);
+
   const row = {
     sample_id:          crypto.randomUUID(),
     timestamp:          new Date().toISOString(),
     subject_session_id: crypto.randomUUID(),
-    label:              null,              // unknown = user uploads their own file
+    label:              null,
     extracted_features: features,
-    prediction_output:  result.label,     // 'balanced' or 'impaired'
+    prediction_output:  result.label,
+    storage_path:       `${sampleId}/${filename}`,
   }
   const { error } = await sb.from(SUPABASE_TABLE).insert([row])
   if (error) console.error('Supabase save failed:', error.message)
@@ -721,7 +729,7 @@ function handleFile(file) {
 
     const result = predict(features);
     showPrediction(result, features, file.name, rows.length);
-    saveToSupabase(features, result, file.name);
+    saveToSupabase(features, result, file.name, reader.result);
   };
   reader.readAsText(file);
 }
