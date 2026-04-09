@@ -1,0 +1,97 @@
+{
+  "model_type": "logistic_regression",
+  "task": "romberg_eyes_open_closed",
+  "feature_names": [
+    "rms_sway",
+    "std_x",
+    "std_y",
+    "std_z",
+    "mean_jerk",
+    "path_length",
+    "sway_mean",
+    "sway_peak"
+  ],
+  "scaler_mean": [
+    0.12634987791657074,
+    0.0507540300441189,
+    0.06047212082272496,
+    0.09752990021270959,
+    5.955201503987418,
+    0.05953183030033423,
+    0.10078048032413889,
+    0.7537447474340783
+  ],
+  "scaler_std": [
+    0.09417262054238536,
+    0.03844264806999143,
+    0.04740451180224844,
+    0.07323126915116956,
+    2.5455029531981745,
+    0.025446599217177936,
+    0.048271355203287826,
+    1.4867678219453613
+  ],
+  "weights": [
+    0.1567377463711901,
+    -1.5845683110806335,
+    -0.8557710937965766,
+    0.9670290231029263,
+    1.0250871085653546,
+    1.0250447103545444,
+    -2.0287595052389826,
+    0.6779329800951032
+  ],
+  "bias": -0.058943520734125794,
+  "classes": [
+    "eyes_closed",
+    "eyes_open"
+  ],
+  "cv_accuracy": 0.625,
+  "cv_type": "Leave-One-Subject-Out",
+  "cv_metrics": {
+    "precision": {
+      "eyes_closed": 0.8571,
+      "eyes_open": 0.5758
+    },
+    "recall": {
+      "eyes_closed": 0.3,
+      "eyes_open": 0.95
+    },
+    "f1": {
+      "eyes_closed": 0.4444,
+      "eyes_open": 0.717
+    },
+    "confusion_matrix": [
+      [
+        12,
+        28
+      ],
+      [
+        2,
+        38
+      ]
+    ]
+  },
+  "per_subject_accuracy": [
+    {
+      "subject": "Sophia",
+      "accuracy": 0.525
+    },
+    {
+      "subject": "Syed",
+      "accuracy": 0.725
+    }
+  ],
+  "dataset_info": {
+    "n_subjects": 2,
+    "subjects": [
+      "Sophia",
+      "Syed"
+    ],
+    "n_windows": 80,
+    "n_eyes_open": 40,
+    "n_eyes_closed": 40,
+    "window_size_sec": 30.0,
+    "sample_rate_hz": 100
+  }
+}

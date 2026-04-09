@@ -4,9 +4,17 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Romberger — Posture Classification</title>
+  <meta name="description" content="Classify standing vs sitting from smartphone accelerometer data using a logistic regression model trained on the MotionSense dataset.">
+  <meta property="og:title" content="Romberger — Posture Classification">
+  <meta property="og:description" content="Upload accelerometer CSVs and get instant standing/sitting predictions. Explore the training pipeline, dataset, and model performance.">
+  <meta property="og:type" content="website">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Romberger — Posture Classification">
+  <meta name="twitter:description" content="Interactive posture classifier with accelerometer data. Upload CSVs, explore the ML pipeline, and test predictions client-side.">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='30' r='12' fill='%232d5a3d'/><line x1='50' y1='42' x2='50' y2='72' stroke='%232d5a3d' stroke-width='6' stroke-linecap='round'/><line x1='50' y1='72' x2='35' y2='95' stroke='%232d5a3d' stroke-width='5' stroke-linecap='round'/><line x1='50' y1='72' x2='65' y2='95' stroke='%232d5a3d' stroke-width='5' stroke-linecap='round'/><line x1='50' y1='52' x2='30' y2='62' stroke='%232d5a3d' stroke-width='5' stroke-linecap='round'/><line x1='50' y1='52' x2='70' y2='62' stroke='%232d5a3d' stroke-width='5' stroke-linecap='round'/></svg>">
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,400;0,500;0,700;1,400&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <style>
     :root {
       --bg: #f5f3ef;
@@ -20,8 +28,32 @@
       --shadow: 0 2px 20px rgba(0,0,0,0.04);
       --standing-color: #2980b9;
       --sitting-color: #c0392b;
+      --open-color: #2980b9;
+      --open-bg: rgba(41,128,185,.08);
+      --closed-color: #c0392b;
+      --closed-bg: rgba(192,57,43,.08);
     }
+
+    [data-theme="dark"] {
+      --bg: #1a1a1f;
+      --surface: #26262c;
+      --text: #e8e6e1;
+      --text-muted: #9a9590;
+      --accent: #4a9d6b;
+      --accent-light: rgba(74,157,107,.12);
+      --border: #3a3a42;
+      --shadow: 0 2px 20px rgba(0,0,0,0.2);
+      --standing-color: #5ba8d4;
+      --sitting-color: #d4635a;
+      --open-color: #5ba8d4;
+      --open-bg: rgba(91,168,212,.1);
+      --closed-color: #d4635a;
+      --closed-bg: rgba(212,99,90,.1);
+    }
+
     * { margin: 0; padding: 0; box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+
     body {
       font-family: 'DM Sans', sans-serif;
       background: var(--bg); color: var(--text);
@@ -36,9 +68,28 @@
     }
     .logo { font-family: 'Instrument Serif', serif; font-size: 1.55rem; letter-spacing: -0.02em; color: var(--accent); }
     .logo span { font-style: italic; opacity: .55; font-weight: 400; }
+    .nav-right { display: flex; align-items: center; gap: 2rem; }
     .nav-links { display: flex; gap: 2rem; }
-    .nav-links a { text-decoration: none; color: var(--text-muted); font-size: 0.9rem; font-weight: 500; transition: color .2s; }
+    .nav-links a {
+      text-decoration: none; color: var(--text-muted); font-size: 0.9rem; font-weight: 500;
+      transition: color .2s; position: relative;
+    }
+    .nav-links a::after {
+      content: ''; position: absolute; bottom: -4px; left: 0; width: 100%; height: 2px;
+      background: var(--accent); transform: scaleX(0); transition: transform .25s ease;
+      transform-origin: center;
+    }
     .nav-links a:hover { color: var(--accent); }
+    .nav-links a:hover::after { transform: scaleX(1); }
+
+    .theme-toggle {
+      width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--border);
+      background: var(--surface); cursor: pointer; display: flex; align-items: center; justify-content: center;
+      transition: background .2s, border-color .2s; flex-shrink: 0;
+    }
+    .theme-toggle:hover { border-color: var(--accent); background: var(--accent-light); }
+    .theme-toggle svg { width: 18px; height: 18px; stroke: var(--text-muted); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .theme-toggle:hover svg { stroke: var(--accent); }
 
     /* Sections */
     section { max-width: 960px; margin: 0 auto; padding: 4rem 2rem; }
@@ -48,13 +99,72 @@
     .section-desc { color: var(--text-muted); font-size: .95rem; line-height: 1.6; max-width: 600px; }
 
     /* Hero */
-    .hero { text-align: center; padding: 5rem 2rem 3.5rem; }
+    .hero { text-align: center; padding: 5rem 2rem 3.5rem; position: relative; overflow: hidden; }
+    #heroCanvas { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0.25; pointer-events: none; }
     .hero h1 {
       font-family: 'Instrument Serif', serif;
       font-size: clamp(2.2rem, 5vw, 3.4rem);
       font-weight: 400; line-height: 1.15; letter-spacing: -0.025em; margin-bottom: 1.25rem;
+      position: relative;
     }
-    .hero p { color: var(--text-muted); font-size: 1.02rem; max-width: 600px; margin: 0 auto 2rem; line-height: 1.6; }
+    .hero p { color: var(--text-muted); font-size: 1.02rem; max-width: 600px; margin: 0 auto 2rem; line-height: 1.6; position: relative; }
+    .hero-buttons { display: flex; gap: .75rem; justify-content: center; align-items: center; flex-wrap: wrap; position: relative; }
+
+    /* Buttons */
+    .btn-primary {
+      display: inline-block; background: var(--accent); color: #fff;
+      padding: .8rem 2rem; border-radius: 99px; text-decoration: none;
+      font-weight: 600; font-size: .92rem; border: none; cursor: pointer;
+      font-family: 'DM Sans', sans-serif;
+      transition: transform .15s, box-shadow .2s;
+    }
+    .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 16px rgba(45,90,61,.25); }
+    .btn-primary:active { transform: scale(0.98); }
+    .btn-primary:disabled { opacity: .45; pointer-events: none; }
+    .btn-primary:focus-visible, .btn-secondary:focus-visible, .btn-icon:focus-visible, .btn-download:focus-visible {
+      outline: 2px solid var(--accent); outline-offset: 2px;
+    }
+
+    .btn-secondary {
+      display: inline-block; background: transparent; color: var(--accent);
+      padding: .7rem 1.6rem; border-radius: 99px;
+      font-weight: 600; font-size: .88rem; border: 1.5px solid var(--accent); cursor: pointer;
+      font-family: 'DM Sans', sans-serif;
+      transition: background .15s, color .15s, transform .15s;
+    }
+    .btn-secondary:hover { background: var(--accent-light); }
+    .btn-secondary:active { transform: scale(0.98); }
+    .btn-secondary:disabled { opacity: .4; pointer-events: none; }
+
+    .btn-download {
+      display: inline-flex; align-items: center; gap: .4rem;
+      background: var(--accent); color: #fff; padding: .55rem 1.2rem; border-radius: 99px;
+      text-decoration: none; font-weight: 600; font-size: .82rem; border: none; cursor: pointer;
+      font-family: 'DM Sans', sans-serif;
+      transition: transform .15s, box-shadow .2s; white-space: nowrap;
+    }
+    .btn-download:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(45,90,61,.25); }
+    .btn-download svg { width: 14px; height: 14px; stroke: #fff; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+    /* How It Works */
+    .how-it-works { max-width: 960px; margin: 0 auto; padding: 2rem 2rem 0; border-top: none !important; }
+    .steps-row { display: flex; align-items: flex-start; justify-content: center; gap: 0; }
+    .step { text-align: center; flex: 1; max-width: 220px; }
+    .step-number {
+      width: 44px; height: 44px; border-radius: 50%; background: var(--accent);
+      color: #fff; font-family: 'Instrument Serif', serif; font-size: 1.2rem;
+      display: flex; align-items: center; justify-content: center; margin: 0 auto .8rem;
+    }
+    .step h4 { font-size: .95rem; font-weight: 700; margin-bottom: .3rem; }
+    .step p { font-size: .82rem; color: var(--text-muted); line-height: 1.5; }
+    .step-connector {
+      width: 60px; height: 2px; background: none; margin-top: 22px; flex-shrink: 0;
+      border-top: 2px dashed var(--border);
+    }
+    @media (max-width: 640px) {
+      .steps-row { flex-direction: column; align-items: center; gap: 1rem; }
+      .step-connector { width: 2px; height: 30px; border-top: none; border-left: 2px dashed var(--border); }
+    }
 
     /* Cards & Grid */
     .card { background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); padding: 1.5rem; }
@@ -66,7 +176,12 @@
 
     .charts-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-top: 1.5rem; }
     @media (max-width: 700px) { .charts-row { grid-template-columns: 1fr; } }
-    .chart-card { background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); padding: 1.5rem; animation: fadeUp .45s ease; }
+    .chart-card {
+      background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow);
+      padding: 1.5rem; animation: fadeUp .45s ease;
+      transition: transform .25s ease, box-shadow .25s ease;
+    }
+    .chart-card:hover { transform: translateY(-2px); box-shadow: 0 6px 24px rgba(0,0,0,.08); }
     .chart-card h4 { font-family: 'Instrument Serif', serif; font-size: 1.1rem; margin-bottom: .2rem; }
     .chart-card .chart-sub { font-size: .76rem; color: var(--text-muted); margin-bottom: 1rem; line-height: 1.4; }
     .chart-card canvas { width: 100% !important; }
@@ -90,7 +205,7 @@
     /* Metrics table */
     .metrics-table { width: 100%; border-collapse: collapse; font-size: .85rem; margin-top: 1rem; }
     .metrics-table th { background: var(--bg); font-weight: 600; text-align: left; padding: .6rem 1rem; border-bottom: 1px solid var(--border); font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; color: var(--text-muted); }
-    .metrics-table td { padding: .55rem 1rem; border-bottom: 1px solid #f0ece7; font-variant-numeric: tabular-nums; }
+    .metrics-table td { padding: .55rem 1rem; border-bottom: 1px solid var(--border); font-variant-numeric: tabular-nums; }
     .metrics-table tbody tr:hover { background: var(--accent-light); }
 
     /* Upload zone */
@@ -117,9 +232,72 @@
     .prediction-confidence { font-size: .9rem; color: var(--text-muted); }
     .prediction-features { margin-top: 1.5rem; text-align: left; max-width: 400px; margin-left: auto; margin-right: auto; }
     .pred-feat-row { display: flex; justify-content: space-between; padding: .35rem 0; font-size: .82rem; }
-    .pred-feat-row + .pred-feat-row { border-top: 1px solid #f0ece7; }
+    .pred-feat-row + .pred-feat-row { border-top: 1px solid var(--border); }
     .pred-feat-label { color: var(--text-muted); }
     .pred-feat-val { font-weight: 600; font-variant-numeric: tabular-nums; }
+
+    /* Stick figure animation */
+    .stick-animation-card {
+      margin-top: 2rem; padding: 1.5rem; background: var(--bg);
+      border-radius: var(--radius); text-align: center;
+    }
+    .stick-animation-card h4 {
+      font-family: 'Instrument Serif', serif; font-size: 1.1rem; margin-bottom: .2rem;
+    }
+    .stick-animation-card .chart-sub {
+      font-size: .76rem; color: var(--text-muted); margin-bottom: 1rem; line-height: 1.4;
+    }
+    #stickCanvas {
+      width: 100%; max-width: 480px; height: 300px;
+      border-radius: 10px; background: var(--surface);
+      display: block; margin: 0 auto;
+    }
+    .stick-controls {
+      display: flex; align-items: center; gap: .6rem;
+      max-width: 480px; margin: .8rem auto 0;
+    }
+    .stick-btn {
+      width: 36px; height: 36px; border-radius: 50%;
+      border: 1.5px solid var(--border); background: var(--surface);
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+      transition: border-color .2s, background .2s; flex-shrink: 0;
+    }
+    .stick-btn:hover { border-color: var(--accent); background: var(--accent-light); }
+    .stick-btn svg { width: 16px; height: 16px; fill: var(--text-muted); stroke: none; }
+    .stick-btn:hover svg { fill: var(--accent); }
+    .stick-scrubber-wrap { flex: 1; }
+    .stick-scrubber {
+      width: 100%; -webkit-appearance: none; appearance: none;
+      height: 4px; border-radius: 2px; background: var(--border);
+      outline: none; cursor: pointer;
+    }
+    .stick-scrubber::-webkit-slider-thumb {
+      -webkit-appearance: none; width: 14px; height: 14px;
+      border-radius: 50%; background: var(--accent); cursor: pointer;
+    }
+    .stick-scrubber::-moz-range-thumb {
+      width: 14px; height: 14px; border: none;
+      border-radius: 50%; background: var(--accent); cursor: pointer;
+    }
+    .stick-time {
+      font-size: .72rem; color: var(--text-muted); white-space: nowrap;
+      font-variant-numeric: tabular-nums; min-width: 90px; text-align: right;
+    }
+    .stick-speed {
+      font-size: .72rem; padding: .25rem .4rem; border-radius: 6px;
+      border: 1px solid var(--border); background: var(--surface);
+      color: var(--text); cursor: pointer; font-family: 'DM Sans', sans-serif;
+    }
+    #rombergStickCanvas {
+      width: 100%; max-width: 480px; height: 340px;
+      border-radius: 10px; background: var(--surface);
+      display: block; margin: 0 auto;
+    }
+    @media (max-width: 640px) {
+      #stickCanvas { height: 240px; }
+      #rombergStickCanvas { height: 280px; }
+      .stick-time { display: none; }
+    }
 
     /* Feature bars */
     .feature-compare { margin-top: 1.5rem; }
@@ -135,16 +313,31 @@
     /* Info cards */
     .card-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.2rem; margin-top: 1.5rem; }
     @media (max-width: 700px) { .card-grid { grid-template-columns: 1fr; } }
-    .info-card { background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); padding: 1.5rem; }
+    .info-card {
+      background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); padding: 1.5rem;
+      transition: transform .25s ease, box-shadow .25s ease;
+    }
+    .info-card:hover { transform: translateY(-3px); box-shadow: 0 6px 24px rgba(0,0,0,.08); }
     .info-card h4 { font-family: 'Instrument Serif', serif; font-size: 1.05rem; margin-bottom: .5rem; }
     .info-card p { font-size: .84rem; color: var(--text-muted); line-height: 1.55; }
+    .info-card-body {
+      max-height: 0; overflow: hidden; transition: max-height .45s ease, padding-top .45s ease;
+      padding-top: 0;
+    }
+    .info-card.expanded .info-card-body { max-height: 500px; padding-top: .8rem; }
+    .info-card-body p { font-size: .84rem; color: var(--text-muted); line-height: 1.6; margin-bottom: .6rem; }
+    .info-card-body strong { color: var(--text); }
+    .card-toggle {
+      display: inline-block; margin-top: .6rem; font-size: .82rem; font-weight: 600;
+      color: var(--accent); cursor: pointer; border: none; background: none;
+      font-family: 'DM Sans', sans-serif; padding: 0;
+    }
+    .card-toggle:hover { text-decoration: underline; }
 
     /* Badge */
     .badge { display: inline-flex; align-items: center; gap: .4rem; padding: .3rem .9rem; border-radius: 99px; font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; }
     .badge-standing { background: rgba(41,128,185,.12); color: var(--standing-color); }
     .badge-sitting { background: rgba(192,57,43,.12); color: var(--sitting-color); }
-
-    footer { text-align: center; padding: 2rem; font-size: .8rem; color: var(--text-muted); border-top: 1px solid var(--border); }
 
     /* Model badge */
     .model-badge {
@@ -191,13 +384,13 @@
     .nb-cell-code pre::-webkit-scrollbar { height: 5px; }
     .nb-cell-code pre::-webkit-scrollbar-thumb { background: rgba(255,255,255,.15); border-radius: 3px; }
     /* Syntax highlight tokens */
-    .tok-kw { color: #cba6f7; }   /* keyword */
-    .tok-fn { color: #89b4fa; }   /* function */
-    .tok-str { color: #a6e3a1; }  /* string */
-    .tok-num { color: #fab387; }  /* number */
-    .tok-cmt { color: #6c7086; font-style: italic; } /* comment */
-    .tok-op { color: #89dceb; }   /* operator/decorator */
-    .tok-cls { color: #f9e2af; }  /* class/type */
+    .tok-kw { color: #cba6f7; }
+    .tok-fn { color: #89b4fa; }
+    .tok-str { color: #a6e3a1; }
+    .tok-num { color: #fab387; }
+    .tok-cmt { color: #6c7086; font-style: italic; }
+    .tok-op { color: #89dceb; }
+    .tok-cls { color: #f9e2af; }
 
     .nb-download-row {
       display: flex; align-items: center; gap: 1rem; margin-bottom: 1.5rem;
@@ -205,42 +398,126 @@
       box-shadow: var(--shadow);
     }
     .nb-download-row p { font-size: .85rem; color: var(--text-muted); flex: 1; }
-    .btn-secondary {
-      display: inline-flex; align-items: center; gap: .4rem;
-      background: var(--accent); color: #fff; padding: .55rem 1.2rem; border-radius: 99px;
-      text-decoration: none; font-weight: 600; font-size: .82rem; border: none; cursor: pointer;
-      transition: transform .15s, box-shadow .2s; white-space: nowrap;
+
+    /* Demo link */
+    .demo-link-row { text-align: center; margin-top: 1rem; font-size: .85rem; color: var(--text-muted); }
+    .demo-link-row a { color: var(--accent); font-weight: 600; text-decoration: none; cursor: pointer; }
+    .demo-link-row a:hover { text-decoration: underline; }
+
+    /* Tooltips */
+    .tooltip-trigger { position: relative; cursor: help; border-bottom: 1px dotted var(--text-muted); }
+    .tooltip-trigger .tooltip-content {
+      position: absolute; bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%) translateY(4px);
+      background: var(--text); color: var(--bg); padding: .5rem .75rem;
+      border-radius: 8px; font-size: .72rem; width: max-content; max-width: 220px;
+      opacity: 0; visibility: hidden; transition: all .2s ease; z-index: 10;
+      pointer-events: none; line-height: 1.4; font-weight: 400; text-align: left;
+      border-bottom: none;
     }
-    .btn-secondary:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(45,90,61,.25); }
-    .btn-secondary svg { width: 14px; height: 14px; stroke: #fff; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .tooltip-trigger:hover .tooltip-content,
+    .tooltip-trigger:focus .tooltip-content { opacity: 1; visibility: visible; transform: translateX(-50%) translateY(0); }
+
+    /* Toast notifications */
+    .toast-container { position: fixed; top: 1rem; right: 1rem; z-index: 1000; display: flex; flex-direction: column; gap: .5rem; pointer-events: none; }
+    .toast {
+      pointer-events: auto; padding: .75rem 1.25rem; border-radius: 10px;
+      font-size: .85rem; font-weight: 500; max-width: 380px;
+      box-shadow: 0 8px 30px rgba(0,0,0,.12); animation: toastIn .3s ease;
+      display: flex; align-items: center; gap: .5rem; line-height: 1.4;
+    }
+    .toast-error { background: #c0392b; color: #fff; }
+    .toast-success { background: var(--accent); color: #fff; }
+    .toast-info { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
+    .toast.toast-out { animation: toastOut .3s ease forwards; }
+    @keyframes toastIn { from { opacity: 0; transform: translateX(40px); } to { opacity: 1; transform: translateX(0); } }
+    @keyframes toastOut { from { opacity: 1; transform: translateX(0); } to { opacity: 0; transform: translateX(40px); } }
+
+    /* Skeleton loading */
+    .skeleton {
+      background: linear-gradient(90deg, var(--border) 25%, var(--bg) 50%, var(--border) 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.5s infinite;
+      border-radius: 8px;
+    }
+    @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+    /* Scroll reveal */
+    .reveal { opacity: 0; transform: translateY(24px); transition: opacity .6s ease, transform .6s ease; }
+    .reveal.visible { opacity: 1; transform: translateY(0); }
+    .reveal-delay-1 { transition-delay: .1s; }
+    .reveal-delay-2 { transition-delay: .2s; }
+    .reveal-delay-3 { transition-delay: .3s; }
+
+    /* Reduced motion */
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+      .reveal { opacity: 1; transform: none; }
+      #heroCanvas { display: none; }
+    }
+
+    footer { text-align: center; padding: 2rem; font-size: .8rem; color: var(--text-muted); border-top: 1px solid var(--border); }
   </style>
 </head>
 <body>
 
-<nav>
+<nav role="navigation" aria-label="Main navigation">
   <div class="logo">Romberger <span>posture</span></div>
-  <div class="nav-links">
-    <a href="#dataset-section">Dataset</a>
-    <a href="#performance-section">Performance</a>
-    <a href="#pipeline-section">Pipeline</a>
-    <a href="#predict-section">Predict</a>
-    <a href="#learn">Learn</a>
-    <a href="#about">About</a>
+  <div class="nav-right">
+    <div class="nav-links">
+      <a href="#dataset-section">Dataset</a>
+      <a href="#performance-section">Performance</a>
+      <a href="#pipeline-section">Pipeline</a>
+      <a href="#predict-section">Predict</a>
+      <a href="#romberg-section">Romberg</a>
+      <a href="#learn">Learn</a>
+      <a href="#about">About</a>
+    </div>
+    <button class="theme-toggle" id="themeToggle" aria-label="Toggle dark mode" title="Toggle dark mode">
+      <svg id="iconSun" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+      <svg id="iconMoon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" style="display:none"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+    </button>
   </div>
 </nav>
 
 <!-- Hero -->
 <section class="hero">
+  <canvas id="heroCanvas"></canvas>
   <h1>Classify posture from<br>phone accelerometer data</h1>
   <p>Trained on the MotionSense dataset, this classifier uses smartphone accelerometer readings to determine whether a person was <strong>standing</strong> or <strong>sitting</strong> during a recording.</p>
-  <a href="#predict-section" class="btn-primary" style="display:inline-block;background:var(--accent);color:#fff;padding:.8rem 2rem;border-radius:99px;text-decoration:none;font-weight:600;font-size:.92rem;transition:transform .15s,box-shadow .2s;margin-top:.5rem;">Try it with your data</a>
+  <div class="hero-buttons">
+    <a href="#predict-section" class="btn-primary">Try it with your data</a>
+    <button class="btn-secondary" id="btnDemo">Try a demo</button>
+  </div>
 </section>
+
+<!-- How It Works -->
+<div class="how-it-works">
+  <div class="steps-row">
+    <div class="step reveal">
+      <div class="step-number">1</div>
+      <h4>Record</h4>
+      <p>Use Sensor Logger or any accelerometer app to capture motion data while standing or sitting.</p>
+    </div>
+    <div class="step-connector"></div>
+    <div class="step reveal reveal-delay-1">
+      <div class="step-number">2</div>
+      <h4>Upload</h4>
+      <p>Export the CSV and drop it into the predict section below.</p>
+    </div>
+    <div class="step-connector"></div>
+    <div class="step reveal reveal-delay-2">
+      <div class="step-number">3</div>
+      <h4>Classify</h4>
+      <p>The model extracts 8 features and predicts standing or sitting instantly in your browser.</p>
+    </div>
+  </div>
+</div>
 
 <!-- 1. Dataset Section -->
 <section id="dataset-section">
-  <p class="section-label">Dataset</p>
-  <h2 class="section-title">MotionSense training data</h2>
-  <p class="section-desc">The model was trained on the MotionSense dataset published by Malekzadeh et al. — accelerometer and gyroscope data collected from an iPhone 6s at 50 Hz, with 24 subjects performing various activities.</p>
+  <p class="section-label reveal">Dataset</p>
+  <h2 class="section-title reveal">MotionSense training data</h2>
+  <p class="section-desc reveal">The model was trained on the MotionSense dataset published by Malekzadeh et al. &#8212; accelerometer and gyroscope data collected from an iPhone 6s at 50 Hz, with 24 subjects performing various activities.</p>
 
   <div class="dataset-stats" style="margin-top:1.5rem">
     <div class="stat-card"><div class="stat-num">24</div><div class="stat-lbl">Subjects</div></div>
@@ -249,7 +526,6 @@
     <div class="stat-card"><div class="stat-num">12</div><div class="stat-lbl">Sensor columns</div></div>
   </div>
 
-  <!-- Dataset details card -->
   <div class="chart-card" style="margin-top:1.5rem">
     <h4>Data structure</h4>
     <p class="chart-sub">Each CSV contains 12 columns of device motion data. We use the 3 userAcceleration columns (x, y, z) for classification.</p>
@@ -264,7 +540,6 @@
     </table>
   </div>
 
-  <!-- Trials breakdown -->
   <div class="charts-row" style="margin-top:1.5rem">
     <div class="chart-card">
       <h4>Activity trials used</h4>
@@ -297,7 +572,6 @@
     </div>
   </div>
 
-  <!-- Final sample counts -->
   <div class="dataset-stats" style="margin-top:1.5rem">
     <div class="stat-card"><div class="stat-num">812</div><div class="stat-lbl">Total windows</div></div>
     <div class="stat-card"><div class="stat-num">386</div><div class="stat-lbl">Standing windows</div></div>
@@ -305,27 +579,24 @@
     <div class="stat-card"><div class="stat-num">8</div><div class="stat-lbl">Features extracted</div></div>
   </div>
 
-  <!-- Subject demographics chart -->
   <div class="chart-card" style="margin-top:1.5rem">
     <h4>Subject demographics</h4>
-    <p class="chart-sub">24 subjects aged 18-46, varied height and weight, 14 male / 10 female</p>
+    <p class="chart-sub">24 subjects aged 18&#8211;46, varied height and weight, 14 male / 10 female</p>
     <canvas id="demographicsChart" height="180"></canvas>
   </div>
 </section>
 
 <!-- 2. Performance Section -->
 <section id="performance-section">
-  <p class="section-label">Performance</p>
-  <h2 class="section-title">Model evaluation</h2>
-  <p class="section-desc">Logistic regression evaluated with leave-one-subject-out cross-validation — the model never sees data from the test subject during training.</p>
+  <p class="section-label reveal">Performance</p>
+  <h2 class="section-title reveal">Model evaluation</h2>
+  <p class="section-desc reveal">Logistic regression evaluated with leave-one-subject-out cross-validation &#8212; the model never sees data from the test subject during training.</p>
 
-  <!-- Accuracy -->
   <div class="accuracy-card">
     <div class="accuracy-big">91.5%</div>
     <div class="accuracy-label">Leave-one-subject-out cross-validation accuracy</div>
   </div>
 
-  <!-- Confusion matrix + metrics -->
   <div class="charts-row" style="margin-top:1.5rem">
     <div class="chart-card" style="text-align:center">
       <h4>Confusion matrix</h4>
@@ -355,33 +626,31 @@
     </div>
   </div>
 
-  <!-- Per-subject chart -->
   <div class="chart-card" style="margin-top:1.5rem">
     <h4>Per-subject classification accuracy</h4>
     <p class="chart-sub">Each bar shows accuracy when that subject was held out as the test set</p>
     <canvas id="perSubjectChart" height="200"></canvas>
   </div>
 
-  <!-- Feature importance -->
   <div class="chart-card" style="margin-top:1.5rem">
     <h4>Feature importance</h4>
-    <p class="chart-sub">Absolute logistic regression coefficient — higher means more influential for the classification decision</p>
+    <p class="chart-sub">Absolute logistic regression coefficient &#8212; higher means more influential for the classification decision</p>
     <canvas id="featureImportanceChart" height="200"></canvas>
   </div>
 </section>
 
 <!-- 3. Pipeline Section (Notebook Viewer) -->
 <section id="pipeline-section">
-  <p class="section-label">Pipeline</p>
-  <h2 class="section-title">Training pipeline</h2>
-  <p class="section-desc">The complete Python notebook used to load data, extract features, train the model, and export weights. Download and run it yourself, or read through below.</p>
+  <p class="section-label reveal">Pipeline</p>
+  <h2 class="section-title reveal">Training pipeline</h2>
+  <p class="section-desc reveal">The complete Python notebook used to load data, extract features, train the model, and export weights. Download and run it yourself, or read through below.</p>
 
   <div class="nb-download-row" style="margin-top:1.5rem">
     <div>
       <div style="font-weight:600;font-size:.9rem">train_model.ipynb</div>
-      <p>Jupyter notebook — requires Python 3, scikit-learn, pandas, numpy, matplotlib, seaborn</p>
+      <p>Jupyter notebook &#8212; requires Python 3, scikit-learn, pandas, numpy, matplotlib, seaborn</p>
     </div>
-    <button class="btn-secondary" onclick="downloadNotebook()">
+    <button class="btn-download" onclick="downloadNotebook()">
       <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
       Download .ipynb
     </button>
@@ -392,11 +661,11 @@
 
 <!-- 4. Predict Section -->
 <section id="predict-section">
-  <p class="section-label">Predict</p>
-  <h2 class="section-title">Test it yourself</h2>
-  <p class="section-desc">Upload an accelerometer CSV from Sensor Logger or any recording app. The model will extract the same 8 features and predict what you were doing — standing or sitting.</p>
+  <p class="section-label reveal">Predict</p>
+  <h2 class="section-title reveal">Test it yourself</h2>
+  <p class="section-desc reveal">Upload an accelerometer CSV from Sensor Logger or any recording app. The model will extract the same 8 features and predict what you were doing &#8212; standing or sitting.</p>
 
-  <div class="upload-zone" id="predictZone">
+  <div class="upload-zone" id="predictZone" role="button" tabindex="0" aria-label="Upload accelerometer CSV for prediction">
     <div class="zone-icon">
       <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
@@ -406,79 +675,177 @@
     <p>Accepts CSV with columns: userAcceleration.x/y/z, or x/y/z, or accelerometerAccelerationX/Y/Z</p>
   </div>
   <input type="file" id="predictFile" accept=".csv" style="display:none">
+  <div class="demo-link-row">No data? <a href="#" id="btnDemoPredict">Load a demo CSV</a> to see the classifier in action.</div>
   <div class="prediction-result" id="predictionResult"></div>
+</section>
+
+<!-- 5. Romberg Test Section -->
+<section id="romberg-section">
+  <p class="section-label reveal">Romberg Test</p>
+  <h2 class="section-title reveal">Eyes open vs. eyes closed</h2>
+  <p class="section-desc reveal">The Romberg test compares postural sway with eyes open versus closed. Upload a Sensor Logger accelerometer CSV recorded while standing still, and the model will predict whether your eyes were open or closed.</p>
+
+  <div class="charts-row" style="margin-top:1.5rem">
+    <div class="chart-card" style="text-align:center">
+      <h4>Model accuracy</h4>
+      <p class="chart-sub">5-fold stratified cross-validation</p>
+      <div class="accuracy-big" style="font-size:2.5rem">62.5%</div>
+      <div class="accuracy-label">Leave-one-subject-out CV, 2 subjects, 80 windows</div>
+      <div class="model-badge" style="margin-top:.8rem"><span class="dot"></span> Early model &#8212; needs more subjects to generalize</div>
+    </div>
+    <div class="chart-card">
+      <h4>How it works</h4>
+      <p class="chart-sub">Same 8 features, different signal</p>
+      <div style="font-size:.84rem;color:var(--text-muted);line-height:1.7">
+        <p><strong style="color:var(--text)">1. Gravity removal</strong> &#8212; raw accelerometer includes gravity (~1g on one axis). We subtract the per-window mean to isolate the sway component.</p>
+        <p style="margin-top:.5rem"><strong style="color:var(--text)">2. Same 8 features</strong> &#8212; RMS sway, std dev X/Y/Z, mean jerk, path length, sway mean &amp; peak.</p>
+        <p style="margin-top:.5rem"><strong style="color:var(--text)">3. Key insight</strong> &#8212; eyes closed increases postural sway because the brain loses visual feedback for balance correction.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="upload-zone" id="rombergZone" role="button" tabindex="0" aria-label="Upload accelerometer CSV for Romberg test">
+    <div class="zone-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+      </svg>
+    </div>
+    <h3>Drop your Sensor Logger CSV here</h3>
+    <p>Accepts CSV with columns: x, y, z (raw accelerometer from Sensor Logger or similar apps)</p>
+  </div>
+  <input type="file" id="rombergFile" accept=".csv" style="display:none">
+  <div class="demo-link-row">No data? <a href="#" id="btnDemoRomberg">Load a demo CSV</a> to see the Romberg classifier.</div>
+  <div class="prediction-result" id="rombergResult"></div>
 </section>
 
 <!-- Learn -->
 <section id="learn">
-  <p class="section-label">Learn</p>
-  <h2 class="section-title">Understanding posture recognition</h2>
-  <p class="section-desc">How phone accelerometers and simple machine learning distinguish standing from sitting.</p>
+  <p class="section-label reveal">Learn</p>
+  <h2 class="section-title reveal">Understanding posture recognition</h2>
+  <p class="section-desc reveal">How phone accelerometers and simple machine learning distinguish standing from sitting.</p>
   <div class="card-grid">
-    <div class="info-card">
+    <div class="info-card reveal reveal-delay-1">
       <h4>Why accelerometers?</h4>
-      <p>Modern smartphones contain 3-axis accelerometers sampling at 50-100 Hz. Standing requires constant micro-adjustments for balance (postural sway), producing higher acceleration variance than the relative stillness of sitting.</p>
+      <p>Modern smartphones contain 3-axis accelerometers sampling at 50&#8211;100 Hz. Standing requires constant micro-adjustments for balance (postural sway), producing higher acceleration variance than the relative stillness of sitting.</p>
+      <div class="info-card-body">
+        <p><strong>MEMS Sensors</strong> &#8212; micro-electro-mechanical systems in your phone detect acceleration along three axes. Even when "still," the sensor captures subtle body movements.</p>
+        <p><strong>Gravity Component</strong> &#8212; the MotionSense dataset separates gravity from user acceleration. We use only user acceleration, which isolates voluntary and involuntary body movements from the constant gravitational pull.</p>
+        <p><strong>Sampling Rate</strong> &#8212; at 50 Hz, we get 1500 data points per 30-second window &#8212; more than enough to capture the frequency range of human postural sway (typically 0.1&#8211;2 Hz).</p>
+      </div>
+      <button class="card-toggle" onclick="this.closest('.info-card').classList.toggle('expanded'); this.textContent = this.closest('.info-card').classList.contains('expanded') ? 'Show less' : 'Read more';">Read more</button>
     </div>
-    <div class="info-card">
+    <div class="info-card reveal reveal-delay-2">
       <h4>Feature engineering</h4>
       <p>Raw acceleration is noisy. We compute 8 statistical features per 30-second window: RMS sway (overall intensity), std dev per axis (directional patterns), mean jerk (movement smoothness), path length, and sway magnitude (mean and peak).</p>
+      <div class="info-card-body">
+        <p><strong>RMS Sway</strong> &#8212; root mean square of the acceleration magnitude vector. Captures overall movement intensity regardless of direction.</p>
+        <p><strong>Standard Deviation (X, Y, Z)</strong> &#8212; measures variability along each axis independently. Standing tends to show higher variability, especially in the lateral (X) and anterior-posterior (Y) axes.</p>
+        <p><strong>Mean Jerk</strong> &#8212; average rate of change of acceleration. Smoother movements produce lower jerk; the constant micro-corrections of standing produce higher jerk.</p>
+        <p><strong>Path Length</strong> &#8212; total distance traveled in acceleration space, normalized by sample count. A proxy for cumulative movement effort.</p>
+      </div>
+      <button class="card-toggle" onclick="this.closest('.info-card').classList.toggle('expanded'); this.textContent = this.closest('.info-card').classList.contains('expanded') ? 'Show less' : 'Read more';">Read more</button>
     </div>
-    <div class="info-card">
+    <div class="info-card reveal reveal-delay-3">
       <h4>The Romberg test</h4>
       <p>The Romberg test is a clinical exam where patients stand with eyes open then closed. Increased sway with eyes closed suggests impaired proprioception. Our posture classifier is a first step toward digitizing this assessment.</p>
+      <div class="info-card-body">
+        <p><strong>History</strong> &#8212; described by Moritz Heinrich Romberg (1795&#8211;1873) in his landmark neurology textbook. Originally used to diagnose tabes dorsalis, a complication of syphilis that destroys proprioceptive pathways.</p>
+        <p><strong>Clinical Use</strong> &#8212; a positive Romberg sign (increased sway with eyes closed) indicates a proprioceptive or vestibular deficit. Crucially, cerebellar disorders cause ataxia in both conditions, so the test differentiates sensory from cerebellar problems.</p>
+        <p><strong>Next Step</strong> &#8212; we are collecting eyes-open vs eyes-closed accelerometer data to train a second model that can detect impaired balance, bringing the digital Romberg test to life.</p>
+      </div>
+      <button class="card-toggle" onclick="this.closest('.info-card').classList.toggle('expanded'); this.textContent = this.closest('.info-card').classList.contains('expanded') ? 'Show less' : 'Read more';">Read more</button>
     </div>
   </div>
   <div class="card-grid" style="margin-top: 1.2rem;">
-    <div class="info-card">
+    <div class="info-card reveal">
       <h4>What is balance?</h4>
       <p>Balance relies on three sensory systems: vision, the vestibular apparatus (inner ear), and proprioception (body position sense). The brain integrates all three to maintain upright posture.</p>
     </div>
-    <div class="info-card">
+    <div class="info-card reveal reveal-delay-1">
       <h4>Loss of balance</h4>
       <p>Impaired balance can result from neurological conditions, inner ear disorders, fatigue, or injury. Even closing your eyes removes visual feedback and increases postural sway in healthy individuals.</p>
     </div>
-    <div class="info-card">
+    <div class="info-card reveal reveal-delay-2">
       <h4>MotionSense dataset</h4>
-      <p>Published by Malekzadeh et al., this dataset collected iPhone 6s motion data from 24 diverse subjects (ages 18-46) across 6 activities. We use the standing and sitting trials for binary classification.</p>
+      <p>Published by Malekzadeh et al., this dataset collected iPhone 6s motion data from 24 diverse subjects (ages 18&#8211;46) across 6 activities. We use the standing and sitting trials for binary classification.</p>
     </div>
   </div>
 </section>
 
 <!-- About -->
 <section id="about">
-  <p class="section-label">About</p>
-  <h2 class="section-title">What is Romberger?</h2>
-  <p class="section-desc" style="max-width:700px">Romberger is an educational tool for exploring posture classification using smartphone accelerometer data. A logistic regression model was trained on the MotionSense dataset in Python (scikit-learn), and its weights are embedded directly in this page. Upload your own sensor recording and get a prediction instantly — everything runs client-side, no server needed. This is not intended for clinical use.</p>
+  <p class="section-label reveal">About</p>
+  <h2 class="section-title reveal">What is Romberger?</h2>
+  <p class="section-desc reveal" style="max-width:700px">Romberger is an educational tool for exploring posture classification using smartphone accelerometer data. A logistic regression model was trained on the MotionSense dataset in Python (scikit-learn), and its weights are embedded directly in this page. Upload your own sensor recording and get a prediction instantly &#8212; everything runs client-side, no server needed. This is not intended for clinical use.</p>
 </section>
 
-<footer><p>Romberger — an educational posture classification tool. Not intended for clinical use.</p></footer>
+<footer><p>Romberger &#8212; an educational posture classification tool. Not intended for clinical use.</p></footer>
+
+<!-- Toast container -->
+<div class="toast-container" id="toastContainer" aria-live="polite"></div>
 
 <script>
-const SUPABASE_URL = 'https://xmxyschvrqcqhqznjdgu.supabase.co'
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhteHlzY2h2cnFjcWhxem5qZGd1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ0NzEzNTgsImV4cCI6MjA5MDA0NzM1OH0.0odYckxFFkZhBaSxA6HB_p7VU1iUCGOeKmlbaR1EDZ4'
-const SUPABASE_TABLE = 'samples'
-const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY)
-async function saveToSupabase(features, result, filename, rawCsvText) {
-  const sampleId = crypto.randomUUID();
+/* ==========================================================
+   TOAST NOTIFICATIONS
+========================================================== */
+const toastContainer = document.getElementById('toastContainer');
 
-  const { error: uploadError } = await sb.storage
-    .from('csv-uploads')
-    .upload(`${sampleId}/${filename}`, new Blob([rawCsvText], { type: 'text/csv' }));
-  if (uploadError) console.error('Storage upload failed:', uploadError.message);
-
-  const row = {
-    sample_id:          crypto.randomUUID(),
-    timestamp:          new Date().toISOString(),
-    subject_session_id: crypto.randomUUID(),
-    label:              null,
-    extracted_features: features,
-    prediction_output:  result.label,
-    storage_path:       `${sampleId}/${filename}`,
-  }
-  const { error } = await sb.from(SUPABASE_TABLE).insert([row])
-  if (error) console.error('Supabase save failed:', error.message)
-  else console.log('Saved to Supabase:', row.sample_id)
+function showToast(message, type = 'error', duration = 4000) {
+  const toast = document.createElement('div');
+  toast.className = `toast toast-${type}`;
+  toast.textContent = message;
+  toastContainer.appendChild(toast);
+  setTimeout(() => {
+    toast.classList.add('toast-out');
+    toast.addEventListener('animationend', () => toast.remove());
+  }, duration);
 }
+
+/* ==========================================================
+   DARK MODE
+========================================================== */
+const themeToggle = document.getElementById('themeToggle');
+const iconSun = document.getElementById('iconSun');
+const iconMoon = document.getElementById('iconMoon');
+
+function setTheme(dark) {
+  document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+  iconSun.style.display = dark ? 'none' : 'block';
+  iconMoon.style.display = dark ? 'block' : 'none';
+  localStorage.setItem('romberg_theme', dark ? 'dark' : 'light');
+}
+
+function updateChartTheme() {
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  const gridColor = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)';
+  const tickColor = isDark ? '#9a9590' : '#6b6560';
+  if (typeof Chart !== 'undefined') {
+    Chart.instances.forEach(ch => {
+      if (ch.options.scales) {
+        Object.values(ch.options.scales).forEach(scale => {
+          if (scale.grid) scale.grid.color = gridColor;
+          if (scale.ticks) scale.ticks.color = tickColor;
+          if (scale.title) scale.title.color = tickColor;
+        });
+      }
+      ch.update('none');
+    });
+  }
+}
+
+(function() {
+  const stored = localStorage.getItem('romberg_theme');
+  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const useDark = stored ? stored === 'dark' : prefersDark;
+  setTheme(useDark);
+})();
+
+themeToggle.addEventListener('click', () => {
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  setTheme(!isDark);
+  updateChartTheme();
+});
+
 /* ==========================================================
    EMBEDDED MODEL WEIGHTS (from train_model.ipynb)
 ========================================================== */
@@ -539,7 +906,6 @@ function extractFeatures(rows) {
     ay = rows.map(r => r['y']);
     az = rows.map(r => r['z']);
   } else {
-    // Try regex match for Sensor Logger columns
     const keys = Object.keys(rows[0]);
     const xCol = keys.find(k => /accel.*x/i.test(k));
     const yCol = keys.find(k => /accel.*y/i.test(k));
@@ -572,14 +938,17 @@ function extractFeatures(rows) {
   }
 
   return {
-    rms_sway: Math.sqrt(mag.reduce((s, v) => s + v*v, 0) / n),
-    std_x: std(ax),
-    std_y: std(ay),
-    std_z: std(az),
-    mean_jerk: mean(jerk),
-    path_length: pathLen / n,
-    sway_mean: mean(mag),
-    sway_peak: Math.max(...mag),
+    features: {
+      rms_sway: Math.sqrt(mag.reduce((s, v) => s + v*v, 0) / n),
+      std_x: std(ax),
+      std_y: std(ay),
+      std_z: std(az),
+      mean_jerk: mean(jerk),
+      path_length: pathLen / n,
+      sway_mean: mean(mag),
+      sway_peak: Math.max(...mag),
+    },
+    accelData: { ax, ay, az },
   };
 }
 
@@ -593,7 +962,7 @@ function predict(features) {
     const scaled = (features[feature_names[i]] - scaler_mean[i]) / scaler_std[i];
     z += weights[i] * scaled;
   }
-  const prob = 1 / (1 + Math.exp(-z)); // probability of classes[1] = "standing"
+  const prob = 1 / (1 + Math.exp(-z));
   return {
     label: prob > 0.5 ? 'standing' : 'sitting',
     confidence: Math.max(prob, 1 - prob),
@@ -602,8 +971,311 @@ function predict(features) {
 }
 
 /* ==========================================================
+   DEMO DATA GENERATOR
+========================================================== */
+function generateDemoCSV(posture) {
+  const hz = 50, duration = 30;
+  const n = hz * duration;
+
+  // Standing: more sway; Sitting: less movement
+  const amp = posture === 'standing' ? 0.035 : 0.008;
+  const noiseScale = posture === 'standing' ? 0.02 : 0.005;
+
+  function gaussRand() {
+    let u = 0, v = 0;
+    while (u === 0) u = Math.random();
+    while (v === 0) v = Math.random();
+    return Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
+  }
+
+  let csv = 'userAcceleration.x,userAcceleration.y,userAcceleration.z\n';
+  for (let i = 0; i < n; i++) {
+    const t = i / hz;
+    const x = amp * Math.sin(2*Math.PI*0.3*t + Math.random()*0.1) + noiseScale * gaussRand();
+    const y = amp * Math.sin(2*Math.PI*0.25*t + 0.8) + noiseScale * gaussRand();
+    const z = amp * 0.3 * Math.sin(2*Math.PI*0.15*t) + noiseScale * 0.5 * gaussRand();
+    csv += `${x.toFixed(6)},${y.toFixed(6)},${z.toFixed(6)}\n`;
+  }
+  return csv;
+}
+
+function loadDemoData() {
+  // Randomly pick standing or sitting for surprise
+  const posture = Math.random() > 0.5 ? 'standing' : 'sitting';
+  const csvText = generateDemoCSV(posture);
+  const { rows } = parseCSV(csvText);
+  const extracted = extractFeatures(rows);
+  if (!extracted) { showToast('Demo generation failed.', 'error'); return; }
+  const { features, accelData } = extracted;
+  const result = predict(features);
+  showPrediction(result, features, `demo_${posture}.csv`, rows.length, accelData);
+  showToast(`Demo loaded! (generated ${posture} data)`, 'success');
+  document.getElementById('predict-section').scrollIntoView({ behavior: 'smooth' });
+}
+
+document.getElementById('btnDemo').addEventListener('click', loadDemoData);
+document.getElementById('btnDemoPredict').addEventListener('click', (e) => { e.preventDefault(); loadDemoData(); });
+
+/* ==========================================================
+   ROMBERG MODEL (eyes open vs eyes closed)
+========================================================== */
+const ROMBERG_MODEL = {
+  feature_names: ["rms_sway","std_x","std_y","std_z","mean_jerk","path_length","sway_mean","sway_peak"],
+  scaler_mean: [0.12634987791657074,0.0507540300441189,0.06047212082272496,0.09752990021270959,5.955201503987418,0.05953183030033423,0.10078048032413889,0.7537447474340783],
+  scaler_std: [0.09417262054238536,0.03844264806999143,0.04740451180224844,0.07323126915116956,2.5455029531981745,0.025446599217177936,0.048271355203287826,1.4867678219453613],
+  weights: [0.1567377463711901,-1.5845683110806335,-0.8557710937965766,0.9670290231029263,1.0250871085653546,1.0250447103545444,-2.0287595052389826,0.6779329800951032],
+  bias: -0.058943520734125794,
+  classes: ["eyes_closed","eyes_open"],
+};
+
+const ROMBERG_SAMPLE_RATE = 100;
+
+function extractFeaturesRomberg(rows) {
+  // Detect columns — Sensor Logger: x, y, z (with gravity)
+  let ax, ay, az;
+  if (rows[0].hasOwnProperty('x')) {
+    ax = rows.map(r => r['x']);
+    ay = rows.map(r => r['y']);
+    az = rows.map(r => r['z']);
+  } else if (rows[0].hasOwnProperty('userAcceleration.x')) {
+    ax = rows.map(r => r['userAcceleration.x']);
+    ay = rows.map(r => r['userAcceleration.y']);
+    az = rows.map(r => r['userAcceleration.z']);
+  } else {
+    const keys = Object.keys(rows[0]);
+    const xCol = keys.find(k => /accel.*x/i.test(k));
+    const yCol = keys.find(k => /accel.*y/i.test(k));
+    const zCol = keys.find(k => /accel.*z/i.test(k));
+    if (xCol && yCol && zCol) {
+      ax = rows.map(r => r[xCol]);
+      ay = rows.map(r => r[yCol]);
+      az = rows.map(r => r[zCol]);
+    } else {
+      return null;
+    }
+  }
+
+  const n = ax.length;
+  if (n < 10) return null;
+
+  // Auto-detect sample rate from seconds_elapsed column if available
+  let sampleRate = ROMBERG_SAMPLE_RATE;
+  if (rows[0].hasOwnProperty('seconds_elapsed') && n > 2) {
+    const totalTime = rows[n-1]['seconds_elapsed'] - rows[0]['seconds_elapsed'];
+    if (totalTime > 0) sampleRate = Math.round((n - 1) / totalTime);
+  }
+
+  // Remove gravity by subtracting per-window mean
+  const mean = arr => arr.reduce((s, v) => s + v, 0) / arr.length;
+  const meanAx = mean(ax), meanAy = mean(ay), meanAz = mean(az);
+  ax = ax.map(v => v - meanAx);
+  ay = ay.map(v => v - meanAy);
+  az = az.map(v => v - meanAz);
+
+  const std = arr => { const m = mean(arr); return Math.sqrt(arr.reduce((s, v) => s + (v - m)**2, 0) / arr.length); };
+  const mag = ax.map((x, i) => Math.sqrt(x*x + ay[i]*ay[i] + az[i]*az[i]));
+
+  const jerk = [];
+  for (let i = 1; i < n; i++) {
+    const dx = ax[i]-ax[i-1], dy = ay[i]-ay[i-1], dz = az[i]-az[i-1];
+    jerk.push(Math.sqrt(dx*dx + dy*dy + dz*dz) * sampleRate);
+  }
+
+  let pathLen = 0;
+  for (let i = 1; i < n; i++) {
+    pathLen += Math.sqrt((ax[i]-ax[i-1])**2 + (ay[i]-ay[i-1])**2 + (az[i]-az[i-1])**2);
+  }
+
+  return {
+    features: {
+      rms_sway: Math.sqrt(mag.reduce((s, v) => s + v*v, 0) / n),
+      std_x: std(ax),
+      std_y: std(ay),
+      std_z: std(az),
+      mean_jerk: mean(jerk),
+      path_length: pathLen / n,
+      sway_mean: mean(mag),
+      sway_peak: Math.max(...mag),
+    },
+    sampleRate: sampleRate,
+    accelData: { ax, ay, az },
+  };
+}
+
+function predictRomberg(features) {
+  const { weights, bias, scaler_mean, scaler_std, feature_names, classes } = ROMBERG_MODEL;
+  let z = bias;
+  for (let i = 0; i < feature_names.length; i++) {
+    const scaled = (features[feature_names[i]] - scaler_mean[i]) / scaler_std[i];
+    z += weights[i] * scaled;
+  }
+  const prob = 1 / (1 + Math.exp(-z));
+  return {
+    label: prob > 0.5 ? classes[1] : classes[0],
+    confidence: Math.max(prob, 1 - prob),
+    probOpen: prob,
+  };
+}
+
+function showRombergPrediction(result, features, filename, sampleCount, accelData, detectedRate) {
+  const rate = detectedRate || ROMBERG_SAMPLE_RATE;
+  if (window._rombergAnimator) { window._rombergAnimator.destroy(); window._rombergAnimator = null; }
+
+  const el = document.getElementById('rombergResult');
+  el.classList.add('visible');
+
+  const isOpen = result.label === 'eyes_open';
+  const color = isOpen ? 'var(--open-color)' : 'var(--closed-color)';
+  const icon = isOpen ? '&#128065;' : '&#128564;';
+  const labelText = isOpen ? 'EYES OPEN' : 'EYES CLOSED';
+  const duration = (sampleCount / rate).toFixed(1);
+
+  let featHtml = '';
+  ROMBERG_MODEL.feature_names.forEach(f => {
+    featHtml += `<div class="pred-feat-row"><span class="pred-feat-label">${FEATURE_LABELS[f]}</span><span class="pred-feat-val">${features[f].toFixed(5)}</span></div>`;
+  });
+
+  el.innerHTML = `
+    <div style="font-size:2rem">${icon}</div>
+    <div class="prediction-label" style="color:${color}">${labelText}</div>
+    <div class="prediction-confidence">
+      Confidence: ${(result.confidence * 100).toFixed(1)}% &nbsp;|&nbsp;
+      P(eyes open): ${(result.probOpen * 100).toFixed(1)}% &nbsp;|&nbsp;
+      ${filename} &nbsp;|&nbsp; ${sampleCount} samples (~${duration}s)
+    </div>
+    <div class="prediction-features">
+      <h4 style="font-family:'Instrument Serif',serif;font-size:1rem;margin-bottom:.5rem">Extracted features</h4>
+      ${featHtml}
+    </div>
+    <div class="stick-animation-card" id="rombergAnimationCard">
+      <h4>Movement Replay</h4>
+      <p class="chart-sub">Stick figure animated with your actual accelerometer data</p>
+      <canvas id="rombergStickCanvas"></canvas>
+      <div class="stick-controls">
+        <button class="stick-btn" id="rombergPlayPause" aria-label="Play/Pause">
+          <svg id="rombergIconPause" viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+          <svg id="rombergIconPlay" viewBox="0 0 24 24" style="display:none"><polygon points="6,4 20,12 6,20"/></svg>
+        </button>
+        <div class="stick-scrubber-wrap">
+          <input type="range" id="rombergScrubber" min="0" max="1000" value="0" class="stick-scrubber">
+        </div>
+        <span class="stick-time" id="rombergTime">0.0s / ${duration}s</span>
+        <select class="stick-speed" id="rombergSpeed">
+          <option value="0.5">0.5x</option>
+          <option value="1" selected>1x</option>
+          <option value="2">2x</option>
+        </select>
+      </div>
+    </div>
+  `;
+
+  if (accelData) {
+    const canvas = document.getElementById('rombergStickCanvas');
+    const animator = new StickFigureAnimator(canvas, accelData, 'standing', rate, 'romberg');
+    window._rombergAnimator = animator;
+
+    document.getElementById('rombergPlayPause').addEventListener('click', () => animator.togglePlayPause());
+    document.getElementById('rombergScrubber').addEventListener('input', function() {
+      animator.seek(parseFloat(this.value) / 1000);
+    });
+    document.getElementById('rombergSpeed').addEventListener('change', function() {
+      animator.setSpeed(parseFloat(this.value));
+    });
+
+    animator.play();
+  }
+}
+
+function generateRombergDemoCSV(condition) {
+  const hz = 100, duration = 30;
+  const n = hz * duration;
+
+  // Eyes closed: more sway; Eyes open: less sway (both standing)
+  // These include gravity (~-9.8 on z axis)
+  const amp = condition === 'eyes_closed' ? 0.18 : 0.10;
+  const noiseScale = condition === 'eyes_closed' ? 0.08 : 0.04;
+
+  function gaussRand() {
+    let u = 0, v = 0;
+    while (u === 0) u = Math.random();
+    while (v === 0) v = Math.random();
+    return Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
+  }
+
+  let csv = 'time,seconds_elapsed,z,y,x\n';
+  for (let i = 0; i < n; i++) {
+    const t = i / hz;
+    const x = amp * Math.sin(2*Math.PI*0.3*t + Math.random()*0.1) + noiseScale * gaussRand();
+    const y = amp * Math.sin(2*Math.PI*0.25*t + 0.8) + noiseScale * gaussRand();
+    const z = -9.81 + amp * 0.3 * Math.sin(2*Math.PI*0.15*t) + noiseScale * 0.5 * gaussRand();
+    csv += `${Date.now() * 1e6},${t.toFixed(6)},${z.toFixed(6)},${y.toFixed(6)},${x.toFixed(6)}\n`;
+  }
+  return csv;
+}
+
+function loadRombergDemoData() {
+  const condition = Math.random() > 0.5 ? 'eyes_open' : 'eyes_closed';
+  const csvText = generateRombergDemoCSV(condition);
+  const { rows } = parseCSV(csvText);
+  const extracted = extractFeaturesRomberg(rows);
+  if (!extracted) { showToast('Demo generation failed.', 'error'); return; }
+  const { features, accelData, sampleRate: detectedRate } = extracted;
+  const result = predictRomberg(features);
+  showRombergPrediction(result, features, `demo_${condition}.csv`, rows.length, accelData, detectedRate);
+  showToast(`Romberg demo loaded! (generated ${condition.replace('_', ' ')} data)`, 'success');
+  document.getElementById('romberg-section').scrollIntoView({ behavior: 'smooth' });
+}
+
+document.getElementById('btnDemoRomberg').addEventListener('click', (e) => { e.preventDefault(); loadRombergDemoData(); });
+
+// Romberg file upload
+const rombergZone = document.getElementById('rombergZone');
+const rombergFile = document.getElementById('rombergFile');
+
+rombergZone.addEventListener('click', () => rombergFile.click());
+rombergZone.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); rombergFile.click(); }
+});
+rombergZone.addEventListener('dragover', e => { e.preventDefault(); rombergZone.classList.add('drag-over'); });
+rombergZone.addEventListener('dragleave', () => rombergZone.classList.remove('drag-over'));
+rombergZone.addEventListener('drop', e => {
+  e.preventDefault();
+  rombergZone.classList.remove('drag-over');
+  if (e.dataTransfer.files.length) handleRombergFile(e.dataTransfer.files[0]);
+});
+rombergFile.addEventListener('change', () => {
+  if (rombergFile.files.length) handleRombergFile(rombergFile.files[0]);
+});
+
+function handleRombergFile(file) {
+  const reader = new FileReader();
+  reader.onload = () => {
+    const { rows } = parseCSV(reader.result);
+    if (rows.length < 10) {
+      showToast('CSV has too few rows. Need at least 10 data rows.', 'error');
+      return;
+    }
+
+    const extracted = extractFeaturesRomberg(rows);
+    if (!extracted) {
+      showToast('Could not find acceleration columns. Expected: x/y/z or accelerometerAccelerationX/Y/Z', 'error');
+      return;
+    }
+    const { features, accelData, sampleRate: detectedRate } = extracted;
+
+    const result = predictRomberg(features);
+    showRombergPrediction(result, features, file.name, rows.length, accelData, detectedRate);
+  };
+  reader.readAsText(file);
+}
+
+/* ==========================================================
    CHARTS (render on page load)
 ========================================================== */
+const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+const gridColor = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)';
+const tickColor = isDark ? '#9a9590' : '#6b6560';
+
 // Per-subject accuracy
 const psData = MODEL.per_subject_accuracy;
 new Chart(document.getElementById('perSubjectChart').getContext('2d'), {
@@ -623,8 +1295,8 @@ new Chart(document.getElementById('perSubjectChart').getContext('2d'), {
     responsive: true,
     plugins: { legend: { display: false } },
     scales: {
-      y: { beginAtZero: true, max: 100, title: { display: true, text: 'Accuracy %', font: { family: 'DM Sans' } }, grid: { color: '#f0ece7' } },
-      x: { grid: { display: false }, ticks: { font: { size: 10 } } }
+      y: { beginAtZero: true, max: 100, title: { display: true, text: 'Accuracy %', font: { family: 'DM Sans' }, color: tickColor }, grid: { color: gridColor }, ticks: { color: tickColor } },
+      x: { grid: { display: false }, ticks: { font: { size: 10 }, color: tickColor } }
     }
   }
 });
@@ -648,13 +1320,13 @@ new Chart(document.getElementById('featureImportanceChart').getContext('2d'), {
     responsive: true,
     plugins: { legend: { display: false } },
     scales: {
-      x: { title: { display: true, text: '|Weight|', font: { family: 'DM Sans' } }, grid: { color: '#f0ece7' } },
-      y: { grid: { display: false } }
+      x: { title: { display: true, text: '|Weight|', font: { family: 'DM Sans' }, color: tickColor }, grid: { color: gridColor }, ticks: { color: tickColor } },
+      y: { grid: { display: false }, ticks: { color: tickColor } }
     }
   }
 });
 
-// Subject demographics (from data_subjects_info.csv)
+// Subject demographics
 const subjects = [
   {id:1,weight:102,height:188,age:46,gender:'M'},{id:2,weight:72,height:180,age:28,gender:'M'},
   {id:3,weight:48,height:161,age:28,gender:'F'},{id:4,weight:90,height:176,age:31,gender:'M'},
@@ -686,10 +1358,10 @@ new Chart(document.getElementById('demographicsChart').getContext('2d'), {
   },
   options: {
     responsive: true,
-    plugins: { legend: { position: 'top', labels: { usePointStyle: true, font: { family: 'DM Sans', size: 11 } } } },
+    plugins: { legend: { position: 'top', labels: { usePointStyle: true, font: { family: 'DM Sans', size: 11 }, color: tickColor } } },
     scales: {
-      x: { title: { display: true, text: 'Height (cm)', font: { family: 'DM Sans' } }, grid: { color: '#f0ece7' } },
-      y: { title: { display: true, text: 'Weight (kg)', font: { family: 'DM Sans' } }, grid: { color: '#f0ece7' } }
+      x: { title: { display: true, text: 'Height (cm)', font: { family: 'DM Sans' }, color: tickColor }, grid: { color: gridColor }, ticks: { color: tickColor } },
+      y: { title: { display: true, text: 'Weight (kg)', font: { family: 'DM Sans' }, color: tickColor }, grid: { color: gridColor }, ticks: { color: tickColor } }
     }
   }
 });
@@ -700,7 +1372,11 @@ new Chart(document.getElementById('demographicsChart').getContext('2d'), {
 const predictZone = document.getElementById('predictZone');
 const predictFile = document.getElementById('predictFile');
 
-predictZone.addEventListener('click', () => predictFile.click());
+function triggerUpload() { predictFile.click(); }
+predictZone.addEventListener('click', triggerUpload);
+predictZone.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); predictFile.click(); }
+});
 predictZone.addEventListener('dragover', e => { e.preventDefault(); predictZone.classList.add('drag-over'); });
 predictZone.addEventListener('dragleave', () => predictZone.classList.remove('drag-over'));
 predictZone.addEventListener('drop', e => {
@@ -717,24 +1393,27 @@ function handleFile(file) {
   reader.onload = () => {
     const { rows } = parseCSV(reader.result);
     if (rows.length < 10) {
-      alert('CSV has too few rows. Need at least 10 data rows.');
+      showToast('CSV has too few rows. Need at least 10 data rows.', 'error');
       return;
     }
 
-    const features = extractFeatures(rows);
-    if (!features) {
-      alert('Could not find acceleration columns. Expected: userAcceleration.x/y/z, or x/y/z, or accelerometerAccelerationX/Y/Z');
+    const extracted = extractFeatures(rows);
+    if (!extracted) {
+      showToast('Could not find acceleration columns. Expected: userAcceleration.x/y/z, or x/y/z, or accelerometerAccelerationX/Y/Z', 'error');
       return;
     }
+    const { features, accelData } = extracted;
 
     const result = predict(features);
-    showPrediction(result, features, file.name, rows.length);
-    saveToSupabase(features, result, file.name, reader.result);
+    showPrediction(result, features, file.name, rows.length, accelData);
   };
   reader.readAsText(file);
 }
 
-function showPrediction(result, features, filename, sampleCount) {
+function showPrediction(result, features, filename, sampleCount, accelData) {
+  // Clean up previous animator
+  if (window._stickAnimator) { window._stickAnimator.destroy(); window._stickAnimator = null; }
+
   const el = document.getElementById('predictionResult');
   el.classList.add('visible');
 
@@ -760,14 +1439,57 @@ function showPrediction(result, features, filename, sampleCount) {
       <h4 style="font-family:'Instrument Serif',serif;font-size:1rem;margin-bottom:.5rem">Extracted features</h4>
       ${featHtml}
     </div>
+    <div class="stick-animation-card" id="stickAnimationCard">
+      <h4>Movement Replay</h4>
+      <p class="chart-sub">Stick figure animated with your actual accelerometer data</p>
+      <canvas id="stickCanvas"></canvas>
+      <div class="stick-controls">
+        <button class="stick-btn" id="stickPlayPause" aria-label="Play/Pause">
+          <svg id="stickIconPause" viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+          <svg id="stickIconPlay" viewBox="0 0 24 24" style="display:none"><polygon points="6,4 20,12 6,20"/></svg>
+        </button>
+        <div class="stick-scrubber-wrap">
+          <input type="range" id="stickScrubber" min="0" max="1000" value="0" class="stick-scrubber">
+        </div>
+        <span class="stick-time" id="stickTime">0.0s / ${duration}s</span>
+        <select class="stick-speed" id="stickSpeed">
+          <option value="0.5">0.5x</option>
+          <option value="1" selected>1x</option>
+          <option value="2">2x</option>
+        </select>
+      </div>
+    </div>
   `;
+
+  // Initialize stick figure animator
+  if (accelData) {
+    const canvas = document.getElementById('stickCanvas');
+    const animator = new StickFigureAnimator(canvas, accelData, result.label, SAMPLE_RATE, 'stick');
+    window._stickAnimator = animator;
+
+    // Play/pause
+    document.getElementById('stickPlayPause').addEventListener('click', () => animator.togglePlayPause());
+
+    // Scrubber
+    const scrubber = document.getElementById('stickScrubber');
+    scrubber.addEventListener('input', () => {
+      animator.seek(parseFloat(scrubber.value) / 1000);
+    });
+
+    // Speed
+    document.getElementById('stickSpeed').addEventListener('change', function() {
+      animator.setSpeed(parseFloat(this.value));
+    });
+
+    animator.play();
+  }
 }
 
 /* ==========================================================
    NOTEBOOK DOWNLOAD
 ========================================================== */
 function downloadNotebook() {
-  fetch('train_model.ipynb')
+  fetch('train_model.json')
     .then(r => r.blob())
     .then(blob => {
       const url = URL.createObjectURL(blob);
@@ -780,12 +1502,12 @@ function downloadNotebook() {
       URL.revokeObjectURL(url);
     })
     .catch(() => {
-      alert('Could not fetch the notebook file. If opening from file://, please download it manually from the project folder.');
+      showToast('Could not fetch the notebook file. If opening from file://, please download it manually.', 'info');
     });
 }
 
 /* ==========================================================
-   NOTEBOOK RENDERER — reads actual .ipynb file
+   NOTEBOOK RENDERER
 ========================================================== */
 function renderNotebook(nb) {
   const container = document.getElementById('notebookCells');
@@ -843,12 +1565,18 @@ function highlightPython(code) {
     .replace(/\b([a-zA-Z_]\w*)\s*(?=\()/g, '<span class="tok-fn">$1</span>');
 }
 
-// Try fetch (works with local server), fall back to file input
-fetch('train_model.ipynb')
-  .then(r => { if (!r.ok) throw new Error(); return r.json(); })
-  .then(nb => renderNotebook(nb))
+// Load notebook
+fetch('train_model.json')
+  .then(r => {
+    if (!r.ok) throw new Error();
+    return r.text();
+  })
+  .then(text => {
+    if (text.trim().startsWith('<')) throw new Error('Received HTML instead of JSON');
+    const nb = JSON.parse(text);
+    renderNotebook(nb);
+  })
   .catch(() => {
-    // Show a file picker fallback for file:// protocol
     const container = document.getElementById('notebookCells');
     container.innerHTML =
       '<div class="nb-download-row">' +
@@ -856,7 +1584,7 @@ fetch('train_model.ipynb')
           '<div style="font-weight:600;font-size:.9rem">Can\'t auto-load notebook</div>' +
           '<p>When opening via file://, the browser can\'t read other files. Click below to view it inline, or download the .ipynb above to run in Jupyter.</p>' +
         '</div>' +
-        '<label class="btn-secondary" style="cursor:pointer">' +
+        '<label class="btn-download" style="cursor:pointer">' +
           '<svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="15" x2="12" y2="3"/></svg>' +
           'Load .ipynb' +
           '<input type="file" accept=".ipynb" style="display:none" id="nbFileInput">' +
@@ -876,6 +1604,480 @@ fetch('train_model.ipynb')
       }
     });
   });
+
+/* ==========================================================
+   SCROLL REVEAL (IntersectionObserver)
+========================================================== */
+function initRevealObserver() {
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) { e.target.classList.add('visible'); observer.unobserve(e.target); }
+    });
+  }, { threshold: 0.1 });
+  document.querySelectorAll('.reveal:not(.visible)').forEach(el => observer.observe(el));
+}
+initRevealObserver();
+
+/* ==========================================================
+   STICK FIGURE ANIMATOR
+========================================================== */
+class StickFigureAnimator {
+  constructor(canvas, accelData, posture, sampleRate, idPrefix) {
+    this.canvas = canvas;
+    this.ctx = canvas.getContext('2d');
+    this.posture = posture; // 'standing' or 'sitting'
+    this.sampleRate = sampleRate;
+    this.prefix = idPrefix || 'stick'; // element ID prefix
+    this.speed = 1;
+    this.playing = false;
+    this.frameIndex = 0;
+    this.rafId = null;
+    this.lastTimestamp = null;
+    this.reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    // Trim first and last 5 seconds
+    const trimSamples = sampleRate * 10;
+    const start = Math.min(trimSamples, Math.floor(accelData.ax.length / 3));
+    const end = Math.max(accelData.ax.length - trimSamples, start + 10);
+    const trimmedAx = accelData.ax.slice(start, end);
+    const trimmedAy = accelData.ay.slice(start, end);
+    const trimmedAz = accelData.az.slice(start, end);
+
+    // Smooth acceleration data with EMA
+    const alpha = 0.15;
+    this.ax = this._ema(trimmedAx, alpha);
+    this.ay = this._ema(trimmedAy, alpha);
+    this.az = this._ema(trimmedAz, alpha);
+
+    // Update frame count after trimming
+    this.totalFrames = this.ax.length;
+    this.totalDuration = this.totalFrames / sampleRate;
+
+    // Scale factors — adaptive to data magnitude
+    const arrStd = arr => { const m = arr.reduce((s,v)=>s+v,0)/arr.length; return Math.sqrt(arr.reduce((s,v)=>s+(v-m)**2,0)/arr.length) || 0.01; };
+    const maxStd = Math.max(arrStd(this.ax), arrStd(this.ay), arrStd(this.az));
+    // Target ~25px displacement at 2 sigma
+    const baseScale = 25 / (maxStd * 2);
+    this.scaleX = baseScale;
+    this.scaleY = baseScale * 0.6;
+    this.scaleZ = baseScale * 0.4;
+    // Reduce motion for sitting (less body freedom)
+    if (posture === 'sitting') {
+      this.scaleX *= 0.4;
+      this.scaleY *= 0.4;
+      this.scaleZ *= 0.4;
+    }
+
+    // Trail: store recent frame offsets
+    this.trailLength = 5;
+    this.trail = [];
+
+    this._setupCanvas();
+    this._renderFrame(0);
+  }
+
+  _ema(arr, alpha) {
+    const out = new Float64Array(arr.length);
+    out[0] = arr[0];
+    for (let i = 1; i < arr.length; i++) {
+      out[i] = alpha * arr[i] + (1 - alpha) * out[i - 1];
+    }
+    return out;
+  }
+
+  _setupCanvas() {
+    const rect = this.canvas.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    this.canvas.width = rect.width * dpr;
+    this.canvas.height = rect.height * dpr;
+    this.ctx.scale(dpr, dpr);
+    this.w = rect.width;
+    this.h = rect.height;
+  }
+
+  _getColors() {
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    const figColor = this.posture === 'standing'
+      ? (isDark ? '#5ba8d4' : '#2980b9')
+      : (isDark ? '#d4635a' : '#c0392b');
+    const groundColor = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)';
+    const chairColor = isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.12)';
+    const accelArrowColor = isDark ? 'rgba(255,255,255,0.25)' : 'rgba(0,0,0,0.2)';
+    const textColor = isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.25)';
+    return { figColor, groundColor, chairColor, accelArrowColor, textColor };
+  }
+
+  _getJoints(dx, dy, dz, factor) {
+    const cx = this.w / 2;
+    const cy = this.h * 0.45;
+    const ox = dx * factor;
+    const oy = dz * factor; // vertical bob from z-axis
+    const lean = dy * factor * 0.3; // forward/back lean (subtle)
+
+    if (this.posture === 'standing') {
+      return {
+        head:     { x: cx + ox * 0.8,        y: cy - 100 + oy + lean * 0.5 },
+        neck:     { x: cx + ox * 0.85,       y: cy - 86 + oy + lean * 0.4 },
+        lShoulder:{ x: cx - 22 + ox * 0.9,   y: cy - 78 + oy + lean * 0.3 },
+        rShoulder:{ x: cx + 22 + ox * 0.9,   y: cy - 78 + oy + lean * 0.3 },
+        hip:      { x: cx + ox * 0.5,        y: cy - 30 + oy * 0.3 },
+        lHip:     { x: cx - 12 + ox * 0.4,   y: cy - 30 + oy * 0.3 },
+        rHip:     { x: cx + 12 + ox * 0.4,   y: cy - 30 + oy * 0.3 },
+        lElbow:   { x: cx - 30 + ox * 1.2,   y: cy - 52 + oy * 0.6 },
+        rElbow:   { x: cx + 30 + ox * 1.2,   y: cy - 52 + oy * 0.6 },
+        lHand:    { x: cx - 25 + ox * 1.3,   y: cy - 30 + oy * 0.4 },
+        rHand:    { x: cx + 25 + ox * 1.3,   y: cy - 30 + oy * 0.4 },
+        lKnee:    { x: cx - 14 + ox * 0.15,  y: cy + 15 + oy * 0.1 },
+        rKnee:    { x: cx + 14 + ox * 0.15,  y: cy + 15 + oy * 0.1 },
+        lFoot:    { x: cx - 16,               y: cy + 55 },
+        rFoot:    { x: cx + 16,               y: cy + 55 },
+      };
+    } else {
+      // Sitting — legs bent, less torso range
+      return {
+        head:     { x: cx + ox * 0.8,        y: cy - 80 + oy + lean * 0.5 },
+        neck:     { x: cx + ox * 0.85,       y: cy - 66 + oy + lean * 0.4 },
+        lShoulder:{ x: cx - 22 + ox * 0.9,   y: cy - 58 + oy + lean * 0.3 },
+        rShoulder:{ x: cx + 22 + ox * 0.9,   y: cy - 58 + oy + lean * 0.3 },
+        hip:      { x: cx + ox * 0.5,        y: cy - 10 + oy * 0.3 },
+        lHip:     { x: cx - 12 + ox * 0.4,   y: cy - 10 + oy * 0.3 },
+        rHip:     { x: cx + 12 + ox * 0.4,   y: cy - 10 + oy * 0.3 },
+        lElbow:   { x: cx - 30 + ox * 1.2,   y: cy - 32 + oy * 0.6 },
+        rElbow:   { x: cx + 30 + ox * 1.2,   y: cy - 32 + oy * 0.6 },
+        lHand:    { x: cx - 25 + ox * 1.3,   y: cy - 10 + oy * 0.4 },
+        rHand:    { x: cx + 25 + ox * 1.3,   y: cy - 10 + oy * 0.4 },
+        lKnee:    { x: cx - 20 + ox * 0.15,  y: cy + 5 },
+        rKnee:    { x: cx + 20 + ox * 0.15,  y: cy + 5 },
+        lFoot:    { x: cx - 20,               y: cy + 45 },
+        rFoot:    { x: cx + 20,               y: cy + 45 },
+      };
+    }
+  }
+
+  _drawFigure(joints, color, alpha) {
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 4;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    const line = (a, b) => {
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(b.x, b.y);
+      ctx.stroke();
+    };
+
+    // Torso
+    line(joints.neck, joints.hip);
+    // Shoulders
+    line(joints.lShoulder, joints.rShoulder);
+    // Left arm
+    line(joints.lShoulder, joints.lElbow);
+    line(joints.lElbow, joints.lHand);
+    // Right arm
+    line(joints.rShoulder, joints.rElbow);
+    line(joints.rElbow, joints.rHand);
+    // Left leg (from hip center)
+    line(joints.hip, joints.lKnee);
+    line(joints.lKnee, joints.lFoot);
+    // Right leg (from hip center)
+    line(joints.hip, joints.rKnee);
+    line(joints.rKnee, joints.rFoot);
+
+    // Head
+    ctx.beginPath();
+    ctx.arc(joints.head.x, joints.head.y, 14, 0, Math.PI * 2);
+    ctx.fillStyle = color;
+    ctx.globalAlpha = alpha * 0.3;
+    ctx.fill();
+    ctx.globalAlpha = alpha;
+    ctx.stroke();
+
+    ctx.restore();
+  }
+
+  _drawChair(colors) {
+    if (this.posture !== 'sitting') return;
+    const ctx = this.ctx;
+    const cx = this.w / 2;
+    const cy = this.h * 0.45;
+    ctx.save();
+    ctx.strokeStyle = colors.chairColor;
+    ctx.lineWidth = 3;
+    ctx.lineCap = 'round';
+
+    // Seat
+    ctx.beginPath();
+    ctx.moveTo(cx - 35, cy - 8);
+    ctx.lineTo(cx + 35, cy - 8);
+    ctx.stroke();
+
+    // Back
+    ctx.beginPath();
+    ctx.moveTo(cx + 35, cy - 8);
+    ctx.lineTo(cx + 35, cy - 65);
+    ctx.stroke();
+
+    // Front legs
+    ctx.beginPath();
+    ctx.moveTo(cx - 35, cy - 8);
+    ctx.lineTo(cx - 35, cy + 45);
+    ctx.stroke();
+
+    // Back legs
+    ctx.beginPath();
+    ctx.moveTo(cx + 35, cy - 8);
+    ctx.lineTo(cx + 35, cy + 45);
+    ctx.stroke();
+
+    ctx.restore();
+  }
+
+  _drawGround(colors) {
+    const ctx = this.ctx;
+    const groundY = this.h * 0.45 + 58;
+    ctx.save();
+    ctx.setLineDash([6, 6]);
+    ctx.strokeStyle = colors.groundColor;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(this.w * 0.2, groundY);
+    ctx.lineTo(this.w * 0.8, groundY);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+  }
+
+  _drawAccelVector(frameIdx, colors) {
+    const ctx = this.ctx;
+    const rawAx = this.ax[frameIdx];
+    const rawAy = this.ay[frameIdx];
+    const arrowScale = 400;
+    const originX = 45;
+    const originY = this.h - 35;
+    const tipX = originX + rawAx * arrowScale;
+    const tipY = originY - rawAy * arrowScale;
+
+    ctx.save();
+    ctx.strokeStyle = colors.accelArrowColor;
+    ctx.fillStyle = colors.accelArrowColor;
+    ctx.lineWidth = 2;
+    ctx.lineCap = 'round';
+
+    // Circle at origin
+    ctx.beginPath();
+    ctx.arc(originX, originY, 3, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Arrow line
+    ctx.beginPath();
+    ctx.moveTo(originX, originY);
+    ctx.lineTo(tipX, tipY);
+    ctx.stroke();
+
+    // Arrow head
+    const angle = Math.atan2(-(tipY - originY), tipX - originX);
+    const headLen = 6;
+    ctx.beginPath();
+    ctx.moveTo(tipX, tipY);
+    ctx.lineTo(tipX - headLen * Math.cos(angle - 0.5), tipY + headLen * Math.sin(angle - 0.5));
+    ctx.lineTo(tipX - headLen * Math.cos(angle + 0.5), tipY + headLen * Math.sin(angle + 0.5));
+    ctx.closePath();
+    ctx.fill();
+
+    // Label
+    ctx.font = "500 9px 'DM Sans', sans-serif";
+    ctx.fillStyle = colors.textColor;
+    ctx.fillText('Accel', originX - 10, originY + 14);
+    ctx.restore();
+  }
+
+  _renderFrame(frameIdx) {
+    const ctx = this.ctx;
+    ctx.clearRect(0, 0, this.w, this.h);
+    const colors = this._getColors();
+
+    const idx = Math.min(Math.floor(frameIdx), this.totalFrames - 1);
+    const dx = this.ax[idx] * this.scaleX;
+    const dy = this.ay[idx] * this.scaleY;
+    const dz = this.az[idx] * this.scaleZ;
+
+    // Draw ground and chair first (behind figure)
+    this._drawGround(colors);
+    this._drawChair(colors);
+
+    // Draw motion trail (ghost frames)
+    for (let i = this.trail.length - 1; i >= 0; i--) {
+      const t = this.trail[i];
+      const trailAlpha = 0.08 * (1 - i / this.trailLength);
+      const trailJoints = this._getJoints(t.dx, t.dy, t.dz, 1);
+      this._drawFigure(trailJoints, colors.figColor, trailAlpha);
+    }
+
+    // Draw main figure
+    const joints = this._getJoints(dx, dy, dz, 1);
+    this._drawFigure(joints, colors.figColor, 1);
+
+    // Acceleration vector indicator
+    this._drawAccelVector(idx, colors);
+
+    // Update trail
+    this.trail.unshift({ dx, dy, dz });
+    if (this.trail.length > this.trailLength) this.trail.pop();
+
+    // Update UI controls
+    this._updateControls(idx);
+  }
+
+  _updateControls(frameIdx) {
+    const progress = frameIdx / (this.totalFrames - 1);
+    const currentTime = (frameIdx / this.sampleRate).toFixed(1);
+    const totalTime = this.totalDuration.toFixed(1);
+
+    const scrubber = document.getElementById(this.prefix + 'Scrubber');
+    const timeEl = document.getElementById(this.prefix + 'Time');
+    if (scrubber && !this._scrubbing) scrubber.value = Math.round(progress * 1000);
+    if (timeEl) timeEl.textContent = `${currentTime}s / ${totalTime}s`;
+  }
+
+  _animate(timestamp) {
+    if (!this.playing) return;
+    if (this.lastTimestamp === null) this.lastTimestamp = timestamp;
+
+    const elapsed = (timestamp - this.lastTimestamp) / 1000; // seconds
+    this.lastTimestamp = timestamp;
+
+    // Advance frame index by elapsed time * sample rate * speed
+    this.frameIndex += elapsed * this.sampleRate * this.speed;
+
+    // Loop
+    if (this.frameIndex >= this.totalFrames) {
+      this.frameIndex = 0;
+      this.trail = [];
+    }
+
+    this._renderFrame(this.frameIndex);
+    this.rafId = requestAnimationFrame((t) => this._animate(t));
+  }
+
+  play() {
+    if (this.reducedMotion) return;
+    this.playing = true;
+    this.lastTimestamp = null;
+    const playIcon = document.getElementById(this.prefix + 'IconPlay');
+    const pauseIcon = document.getElementById(this.prefix + 'IconPause');
+    if (playIcon) playIcon.style.display = 'none';
+    if (pauseIcon) pauseIcon.style.display = 'block';
+    this.rafId = requestAnimationFrame((t) => this._animate(t));
+  }
+
+  pause() {
+    this.playing = false;
+    if (this.rafId) cancelAnimationFrame(this.rafId);
+    this.rafId = null;
+    const playIcon = document.getElementById(this.prefix + 'IconPlay');
+    const pauseIcon = document.getElementById(this.prefix + 'IconPause');
+    if (playIcon) playIcon.style.display = 'block';
+    if (pauseIcon) pauseIcon.style.display = 'none';
+  }
+
+  togglePlayPause() {
+    if (this.playing) this.pause();
+    else this.play();
+  }
+
+  seek(fraction) {
+    this._scrubbing = true;
+    this.frameIndex = fraction * (this.totalFrames - 1);
+    this.trail = [];
+    this._renderFrame(this.frameIndex);
+    this._scrubbing = false;
+    if (!this.playing) this.lastTimestamp = null;
+  }
+
+  setSpeed(multiplier) {
+    this.speed = multiplier;
+  }
+
+  destroy() {
+    this.playing = false;
+    if (this.rafId) cancelAnimationFrame(this.rafId);
+    this.rafId = null;
+  }
+}
+
+/* ==========================================================
+   HERO CANVAS ANIMATION
+========================================================== */
+(function() {
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+  const canvas = document.getElementById('heroCanvas');
+  const ctx = canvas.getContext('2d');
+
+  function resize() {
+    const rect = canvas.parentElement.getBoundingClientRect();
+    canvas.width = rect.width * devicePixelRatio;
+    canvas.height = rect.height * devicePixelRatio;
+    ctx.scale(devicePixelRatio, devicePixelRatio);
+  }
+  resize();
+  window.addEventListener('resize', resize);
+
+  const isDarkFn = () => document.documentElement.getAttribute('data-theme') === 'dark';
+  const particles = [];
+  const NUM = 40;
+  for (let i = 0; i < NUM; i++) {
+    particles.push({
+      x: Math.random(), y: Math.random(),
+      phase: Math.random() * Math.PI * 2,
+      freq: 0.2 + Math.random() * 0.4,
+      amp: 0.005 + Math.random() * 0.015,
+      size: 2 + Math.random() * 4,
+    });
+  }
+
+  function draw(time) {
+    const w = canvas.width / devicePixelRatio;
+    const h = canvas.height / devicePixelRatio;
+    ctx.clearRect(0, 0, w, h);
+
+    const dark = isDarkFn();
+    const color = dark ? '74, 157, 107' : '45, 90, 61';
+
+    const t = time / 1000;
+    const cx = w / 2 + Math.sin(t * 0.5) * 30 + Math.sin(t * 0.8 + 1) * 15;
+    const cy = h / 2 + Math.sin(t * 0.35 + 0.5) * 20 + Math.cos(t * 0.6 + 2) * 10;
+
+    particles.forEach(p => {
+      const px = p.x * w + Math.sin(t * p.freq + p.phase) * p.amp * w;
+      const py = p.y * h + Math.cos(t * p.freq * 0.8 + p.phase) * p.amp * h;
+      ctx.beginPath();
+      ctx.arc(px, py, p.size, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(${color}, 0.12)`;
+      ctx.fill();
+    });
+
+    for (let r = 3; r > 0; r--) {
+      ctx.beginPath();
+      ctx.arc(cx, cy, 6 + r * 12, 0, Math.PI * 2);
+      ctx.strokeStyle = `rgba(${color}, ${0.08 / r})`;
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    }
+
+    ctx.beginPath();
+    ctx.arc(cx, cy, 5, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(${color}, 0.3)`;
+    ctx.fill();
+
+    requestAnimationFrame(draw);
+  }
+  requestAnimationFrame(draw);
+})();
 </script>
 </body>
 </html>
