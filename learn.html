@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Romberger — Learn</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,400;0,500;0,700;1,400&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+  <style>
+    /* :root and body styles from index.html here */
+    :root {
+      --bg: #f5f3ef;
+      --surface: #ffffff;
+      --text: #1a1a1a;
+      --text-muted: #6b6560;
+      --accent: #2d5a3d;
+      --accent-light: #e8f0eb;
+      --border: #e0dbd5;
+      --radius: 14px;
+      --shadow: 0 2px 20px rgba(0,0,0,0.04);
+      --standing-color: #2980b9;
+      --sitting-color: #c0392b;
+      --open-color: #2980b9;
+      --open-bg: rgba(41,128,185,.08);
+      --closed-color: #c0392b;
+      --closed-bg: rgba(192,57,43,.08);
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--bg); color: var(--text);
+      min-height: 100vh; -webkit-font-smoothing: antialiased;
+    }
+
+    [data-theme="dark"] {
+      --bg: #1a1a1f;
+      --surface: #26262c;
+      --text: #e8e6e1;
+      --text-muted: #9a9590;
+      --accent: #4a9d6b;
+      --accent-light: rgba(74,157,107,.12);
+      --border: #3a3a42;
+      --shadow: 0 2px 20px rgba(0,0,0,0.2);
+      --standing-color: #5ba8d4;
+      --sitting-color: #d4635a;
+      --open-color: #5ba8d4;
+      --open-bg: rgba(91,168,212,.1);
+      --closed-color: #d4635a;
+      --closed-bg: rgba(212,99,90,.1);
+    }
+
+    nav {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 1.25rem 2.5rem; border-bottom: 1px solid var(--border);
+    background: var(--surface); position: sticky; top: 0; z-index: 100;
+  }
+    
+  .logo { font-family: 'Instrument Serif', serif; font-size: 1.55rem; letter-spacing: -0.02em; color: var(--accent); }
+  .logo span { font-style: italic; opacity: .55; }
+  .nav-links { display: flex; gap: 2rem; }
+  .nav-links a { text-decoration: none; color: var(--text-muted); font-size: 0.9rem; font-weight: 500; transition: color .2s; }
+  .nav-links a:hover { color: var(--accent); }
+
+  section { max-width: 960px; margin: 0 auto; padding: 4rem 2rem; }
+  .section-label { text-transform: uppercase; font-size: .72rem; letter-spacing: .12em; color: var(--accent); font-weight: 700; margin-bottom: .6rem; }
+  .section-title { font-family: 'Instrument Serif', serif; font-size: 1.75rem; font-weight: 400; margin-bottom: .6rem; }
+  .section-desc { color: var(--text-muted); font-size: .95rem; line-height: 1.6; max-width: 600px; }
+
+  .card-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.2rem; margin-top: 1.5rem; }
+  @media (max-width: 700px) { .card-grid { grid-template-columns: 1fr; } }
+
+  .info-card { background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); padding: 1.5rem; transition: transform .25s ease, box-shadow .25s ease; }
+  .info-card:hover { transform: translateY(-3px); box-shadow: 0 6px 24px rgba(0,0,0,.08); }
+  .info-card h4 { font-family: 'Instrument Serif', serif; font-size: 1.05rem; margin-bottom: .5rem; }
+  .info-card p { font-size: .84rem; color: var(--text-muted); line-height: 1.55; }
+
+  .info-card-body { max-height: 0; overflow: hidden; transition: max-height .45s ease, padding-top .45s ease; padding-top: 0; }
+  .info-card.expanded .info-card-body { max-height: 500px; padding-top: .8rem; }
+  .info-card-body p { font-size: .84rem; color: var(--text-muted); line-height: 1.6; margin-bottom: .6rem; }
+  .info-card-body strong { color: var(--text); }
+
+  .card-toggle { display: inline-block; margin-top: .6rem; font-size: .82rem; font-weight: 600; color: var(--accent); cursor: pointer; border: none; background: none; font-family: 'DM Sans', sans-serif; padding: 0; }
+  .card-toggle:hover { text-decoration: underline; }
+
+  .reveal { opacity: 0; transform: translateY(24px); transition: opacity .6s ease, transform .6s ease; }
+  .reveal.visible { opacity: 1; transform: translateY(0); }
+  .reveal-delay-1 { transition-delay: .1s; }
+  .reveal-delay-2 { transition-delay: .2s; }
+  .reveal-delay-3 { transition-delay: .3s; }
+  </style>
+</head>
+<body>
+  <nav>
+    <div class="logo"><a href="index.html" style="text-decoration:none;color:inherit">Romberger <span>posture</span></a></div>
+    <div class="nav-links">
+      <a href="index.html">Home</a>
+      <a href="learn.html" style="color:var(--accent)">Learn</a>
+    </div>
+  </nav>
+  
+<!-- Learn -->
+<section id="learn">
+  <p class="section-label reveal">Learn</p>
+  <h2 class="section-title reveal">Understanding posture recognition</h2>
+  <p class="section-desc reveal">How phone accelerometers and simple machine learning distinguish standing from sitting.</p>
+  <div class="card-grid">
+    <div class="info-card reveal reveal-delay-1">
+      <h4>Why accelerometers?</h4>
+      <p>Modern smartphones contain 3-axis accelerometers sampling at 50&#8211;100 Hz. Standing requires constant micro-adjustments for balance (postural sway), producing higher acceleration variance than the relative stillness of sitting.</p>
+      <div class="info-card-body">
+        <p><strong>MEMS Sensors</strong> &#8212; micro-electro-mechanical systems in your phone detect acceleration along three axes. Even when "still," the sensor captures subtle body movements.</p>
+        <p><strong>Gravity Component</strong> &#8212; the MotionSense dataset separates gravity from user acceleration. We use only user acceleration, which isolates voluntary and involuntary body movements from the constant gravitational pull.</p>
+        <p><strong>Sampling Rate</strong> &#8212; at 50 Hz, we get 1500 data points per 30-second window &#8212; more than enough to capture the frequency range of human postural sway (typically 0.1&#8211;2 Hz).</p>
+      </div>
+      <button class="card-toggle" onclick="this.closest('.info-card').classList.toggle('expanded'); this.textContent = this.closest('.info-card').classList.contains('expanded') ? 'Show less' : 'Read more';">Read more</button>
+    </div>
+    <div class="info-card reveal reveal-delay-2">
+      <h4>Feature engineering</h4>
+      <p>Raw acceleration is noisy. We compute 8 statistical features per 30-second window: RMS sway (overall intensity), std dev per axis (directional patterns), mean jerk (movement smoothness), path length, and sway magnitude (mean and peak).</p>
+      <div class="info-card-body">
+        <p><strong>RMS Sway</strong> &#8212; root mean square of the acceleration magnitude vector. Captures overall movement intensity regardless of direction.</p>
+        <p><strong>Standard Deviation (X, Y, Z)</strong> &#8212; measures variability along each axis independently. Standing tends to show higher variability, especially in the lateral (X) and anterior-posterior (Y) axes.</p>
+        <p><strong>Mean Jerk</strong> &#8212; average rate of change of acceleration. Smoother movements produce lower jerk; the constant micro-corrections of standing produce higher jerk.</p>
+        <p><strong>Path Length</strong> &#8212; total distance traveled in acceleration space, normalized by sample count. A proxy for cumulative movement effort.</p>
+      </div>
+      <button class="card-toggle" onclick="this.closest('.info-card').classList.toggle('expanded'); this.textContent = this.closest('.info-card').classList.contains('expanded') ? 'Show less' : 'Read more';">Read more</button>
+    </div>
+    <div class="info-card reveal reveal-delay-3">
+      <h4>The Romberg test</h4>
+      <p>The Romberg test is a clinical exam where patients stand with eyes open then closed. Increased sway with eyes closed suggests impaired proprioception. Our posture classifier is a first step toward digitizing this assessment.</p>
+      <div class="info-card-body">
+        <p><strong>History</strong> &#8212; described by Moritz Heinrich Romberg (1795&#8211;1873) in his landmark neurology textbook. Originally used to diagnose tabes dorsalis, a complication of syphilis that destroys proprioceptive pathways.</p>
+        <p><strong>Clinical Use</strong> &#8212; a positive Romberg sign (increased sway with eyes closed) indicates a proprioceptive or vestibular deficit. Crucially, cerebellar disorders cause ataxia in both conditions, so the test differentiates sensory from cerebellar problems.</p>
+        <p><strong>Next Step</strong> &#8212; we are collecting eyes-open vs eyes-closed accelerometer data to train a second model that can detect impaired balance, bringing the digital Romberg test to life.</p>
+      </div>
+      <button class="card-toggle" onclick="this.closest('.info-card').classList.toggle('expanded'); this.textContent = this.closest('.info-card').classList.contains('expanded') ? 'Show less' : 'Read more';">Read more</button>
+    </div>
+  </div>
+  <div class="card-grid" style="margin-top: 1.2rem;">
+    <div class="info-card reveal">
+      <h4>What is balance?</h4>
+      <p>Balance relies on three sensory systems: vision, the vestibular apparatus (inner ear), and proprioception (body position sense). The brain integrates all three to maintain upright posture.</p>
+    </div>
+    <div class="info-card reveal reveal-delay-1">
+      <h4>Loss of balance</h4>
+      <p>Impaired balance can result from neurological conditions, inner ear disorders, fatigue, or injury. Even closing your eyes removes visual feedback and increases postural sway in healthy individuals.</p>
+    </div>
+    <div class="info-card reveal reveal-delay-2">
+      <h4>MotionSense dataset</h4>
+      <p>Published by Malekzadeh et al., this dataset collected iPhone 6s motion data from 24 diverse subjects (ages 18&#8211;46) across 6 activities. We use the standing and sitting trials for binary classification.</p>
+    </div>
+  </div>
+</section>
+  
+  <footer style="text-align:center;padding:2rem;font-size:.8rem;color:var(--text-muted);border-top:1px solid var(--border);">
+  <p>Romberger — an educational posture classification tool. Not intended for clinical use.</p>
+  </footer>
+  
+  <script>
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); observer.unobserve(e.target); } });
+  }, { threshold: 0.1 });
+  document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+</script>
+  
+</body>
+</html>
