@@ -17,12 +17,10 @@
       --border: #e0dbd5;
       --radius: 14px;
       --shadow: 0 2px 20px rgba(0,0,0,0.04);
-      --standing-color: #2980b9;
-      --sitting-color: #c0392b;
-      --open-color: #2980b9;
-      --open-bg: rgba(41,128,185,.08);
-      --closed-color: #c0392b;
-      --closed-bg: rgba(192,57,43,.08);
+      --open-color: #27ae60;
+      --open-bg: rgba(39,174,96,.08);
+      --closed-color: #e67e22;
+      --closed-bg: rgba(230,126,34,.08);
     }
     * { margin: 0; padding: 0; box-sizing: border-box; }
     html { scroll-behavior: smooth; }
@@ -42,10 +40,8 @@
       --accent-light: rgba(74,157,107,.12);
       --border: #3a3a42;
       --shadow: 0 2px 20px rgba(0,0,0,0.2);
-      --standing-color: #5ba8d4;
-      --sitting-color: #d4635a;
-      --open-color: #5ba8d4;
-      --open-bg: rgba(91,168,212,.1);
+      --open-color: #4a9d6b;
+      --open-bg: rgba(74,157,107,.1);
       --closed-color: #d4635a;
       --closed-bg: rgba(212,99,90,.1);
     }
@@ -92,13 +88,12 @@
 </head>
 <body>
   <nav>
-    <div class="logo"><a href="index.html" style="text-decoration:none;color:inherit">Romberger <span>posture</span></a></div>
+    <div class="logo"><a href="index.html" style="text-decoration:none;color:inherit">Romberger <span>balance</span></a></div>
     <div class="nav-links">
       <a href="index.html#dataset-section">Dataset</a>
       <a href="index.html#performance-section">Performance</a>
       <a href="index.html#pipeline-section">Pipeline</a>
       <a href="index.html#predict-section">Predict</a>
-      <a href="index.html#romberg-section">Romberg</a>
       <a href="learn.html" style="color:var(--accent)">Learn</a>
     </div>
   </nav>
@@ -108,43 +103,43 @@
 <section id="about">
   <p class="section-label reveal">About</p>
   <h2 class="section-title reveal">What is Romberger?</h2>
-  <p class="section-desc reveal" style="max-width:700px">Romberger is an educational tool for exploring posture classification using smartphone accelerometer data. A logistic regression model was trained on the MotionSense dataset in Python (scikit-learn), and its weights are embedded directly in this page. Upload your own sensor recording and get a prediction instantly &#8212; everything runs client-side, no server needed. This is not intended for clinical use.</p>
+  <p class="section-desc reveal" style="max-width:700px">Romberger is an educational tool that digitizes the Romberg balance test using smartphone accelerometer data. An SVM (linear kernel) model was trained on recordings from 9 subjects in Python (scikit-learn), and its weights are embedded directly in the page. Upload a ~30-second accelerometer CSV and get a prediction &#8212; eyes open (normal balance) or eyes closed (impaired balance) &#8212; instantly in your browser. Not intended for clinical use.</p>
 </section>
   
 <!-- Learn -->
 <section id="learn">
   <p class="section-label reveal">Learn</p>
-  <h2 class="section-title reveal">Understanding posture recognition</h2>
-  <p class="section-desc reveal">How phone accelerometers and simple machine learning distinguish standing from sitting.</p>
+  <h2 class="section-title reveal">Understanding the Romberg balance test</h2>
+  <p class="section-desc reveal">How phone accelerometers and machine learning assess balance by comparing postural sway with eyes open versus closed.</p>
   <div class="card-grid">
     <div class="info-card reveal reveal-delay-1">
       <h4>Why accelerometers?</h4>
-      <p>Modern smartphones contain 3-axis accelerometers sampling at 50&#8211;100 Hz. Standing requires constant micro-adjustments for balance (postural sway), producing higher acceleration variance than the relative stillness of sitting.</p>
+      <p>Modern smartphones contain 3-axis accelerometers sampling at ~100 Hz. When standing still, the body constantly makes micro-adjustments for balance (postural sway), and the accelerometer captures these subtle movements.</p>
       <div class="info-card-body">
-        <p><strong>MEMS Sensors</strong> &#8212; micro-electro-mechanical systems in your phone detect acceleration along three axes. Even when "still," the sensor captures subtle body movements.</p>
-        <p><strong>Gravity Component</strong> &#8212; the MotionSense dataset separates gravity from user acceleration. We use only user acceleration, which isolates voluntary and involuntary body movements from the constant gravitational pull.</p>
-        <p><strong>Sampling Rate</strong> &#8212; at 50 Hz, we get 1500 data points per 30-second window &#8212; more than enough to capture the frequency range of human postural sway (typically 0.1&#8211;2 Hz).</p>
+        <p><strong>MEMS Sensors</strong> &#8212; micro-electro-mechanical systems in your phone detect acceleration along three axes. Even when "still," the sensor captures subtle body movements that reveal balance quality.</p>
+        <p><strong>Sway Magnitude</strong> &#8212; we compute the magnitude (sqrt(x&sup2; + y&sup2; + z&sup2;)) to capture total sway regardless of phone orientation. This single signal contains the balance information we need.</p>
+        <p><strong>Sampling Rate</strong> &#8212; at ~100 Hz, we get ~3000 data points per 30-second recording &#8212; more than enough to capture the frequency range of human postural sway (typically 0.1&#8211;2 Hz).</p>
       </div>
       <button class="card-toggle" onclick="this.closest('.info-card').classList.toggle('expanded'); this.textContent = this.closest('.info-card').classList.contains('expanded') ? 'Show less' : 'Read more';">Read more</button>
     </div>
     <div class="info-card reveal reveal-delay-2">
       <h4>Feature engineering</h4>
-      <p>Raw acceleration is noisy. We compute 8 statistical features per 30-second window: RMS sway (overall intensity), std dev per axis (directional patterns), mean jerk (movement smoothness), path length, and sway magnitude (mean and peak).</p>
+      <p>Raw acceleration is noisy. We compute 6 statistical features from the sway magnitude of each 30-second recording: mean, median, standard deviation, skewness, kurtosis, and path length.</p>
       <div class="info-card-body">
-        <p><strong>RMS Sway</strong> &#8212; root mean square of the acceleration magnitude vector. Captures overall movement intensity regardless of direction.</p>
-        <p><strong>Standard Deviation (X, Y, Z)</strong> &#8212; measures variability along each axis independently. Standing tends to show higher variability, especially in the lateral (X) and anterior-posterior (Y) axes.</p>
-        <p><strong>Mean Jerk</strong> &#8212; average rate of change of acceleration. Smoother movements produce lower jerk; the constant micro-corrections of standing produce higher jerk.</p>
-        <p><strong>Path Length</strong> &#8212; total distance traveled in acceleration space, normalized by sample count. A proxy for cumulative movement effort.</p>
+        <p><strong>Mean &amp; Median</strong> &#8212; central tendency of sway magnitude. Higher values indicate more body movement. Median is the strongest predictor in our model.</p>
+        <p><strong>Standard Deviation</strong> &#8212; measures sway variability. More variable sway suggests less stable balance control.</p>
+        <p><strong>Skewness &amp; Kurtosis</strong> &#8212; capture the shape of the sway distribution. Kurtosis detects spiky, irregular movement patterns common in impaired balance.</p>
+        <p><strong>Path Length</strong> &#8212; total cumulative change in sway magnitude (sum of absolute consecutive differences). A proxy for total movement effort over the recording.</p>
       </div>
       <button class="card-toggle" onclick="this.closest('.info-card').classList.toggle('expanded'); this.textContent = this.closest('.info-card').classList.contains('expanded') ? 'Show less' : 'Read more';">Read more</button>
     </div>
     <div class="info-card reveal reveal-delay-3">
       <h4>The Romberg test</h4>
-      <p>The Romberg test is a clinical exam where patients stand with eyes open then closed. Increased sway with eyes closed suggests impaired proprioception. Our posture classifier is a first step toward digitizing this assessment.</p>
+      <p>The Romberg test is a clinical neurological exam where patients stand with eyes open then closed. Increased sway with eyes closed suggests impaired proprioception. Our classifier digitizes this assessment using smartphone sensors.</p>
       <div class="info-card-body">
         <p><strong>History</strong> &#8212; described by Moritz Heinrich Romberg (1795&#8211;1873) in his landmark neurology textbook. Originally used to diagnose tabes dorsalis, a complication of syphilis that destroys proprioceptive pathways.</p>
         <p><strong>Clinical Use</strong> &#8212; a positive Romberg sign (increased sway with eyes closed) indicates a proprioceptive or vestibular deficit. Crucially, cerebellar disorders cause ataxia in both conditions, so the test differentiates sensory from cerebellar problems.</p>
-        <p><strong>Next Step</strong> &#8212; we are collecting eyes-open vs eyes-closed accelerometer data to train a second model that can detect impaired balance, bringing the digital Romberg test to life.</p>
+        <p><strong>Our Model</strong> &#8212; trained on 142 recordings from 9 subjects, our SVM (linear kernel) classifier achieves 73.9% leave-one-subject-out accuracy, correctly distinguishing eyes-open from eyes-closed balance in most cases.</p>
       </div>
       <button class="card-toggle" onclick="this.closest('.info-card').classList.toggle('expanded'); this.textContent = this.closest('.info-card').classList.contains('expanded') ? 'Show less' : 'Read more';">Read more</button>
     </div>
@@ -159,14 +154,14 @@
       <p>Impaired balance can result from neurological conditions, inner ear disorders, fatigue, or injury. Even closing your eyes removes visual feedback and increases postural sway in healthy individuals.</p>
     </div>
     <div class="info-card reveal reveal-delay-2">
-      <h4>MotionSense dataset</h4>
-      <p>Published by Malekzadeh et al., this dataset collected iPhone 6s motion data from 24 diverse subjects (ages 18&#8211;46) across 6 activities. We use the standing and sitting trials for binary classification.</p>
+      <h4>Our dataset</h4>
+      <p>We collected accelerometer data from 9 subjects using the Sensor Logger app at ~100 Hz. Each subject stood still for 30 seconds with eyes open and eyes closed. Longer recordings were split into 30-second chunks, yielding 142 training samples.</p>
     </div>
   </div>
 </section>
   
   <footer style="text-align:center;padding:2rem;font-size:.8rem;color:var(--text-muted);border-top:1px solid var(--border);">
-  <p>Romberger — an educational posture classification tool. Not intended for clinical use.</p>
+  <p>Romberger &#8212; an educational balance assessment tool using the Romberg test. Not intended for clinical use.</p>
   </footer>
   
   <script>

@@ -1,97 +1,55 @@
 {
-  "model_type": "logistic_regression",
-  "task": "romberg_eyes_open_closed",
-  "feature_names": [
-    "rms_sway",
-    "std_x",
-    "std_y",
-    "std_z",
-    "mean_jerk",
-    "path_length",
-    "sway_mean",
-    "sway_peak"
+  "model_type": "SVM_linear",
+  "description": "Romberg balance test classifier: eyes open (normal) vs eyes closed (impaired)",
+  "features": [
+    "mean",
+    "median",
+    "std",
+    "skewness",
+    "kurtosis",
+    "path_length"
   ],
-  "scaler_mean": [
-    0.12634987791657074,
-    0.0507540300441189,
-    0.06047212082272496,
-    0.09752990021270959,
-    5.955201503987418,
-    0.05953183030033423,
-    0.10078048032413889,
-    0.7537447474340783
-  ],
-  "scaler_std": [
-    0.09417262054238536,
-    0.03844264806999143,
-    0.04740451180224844,
-    0.07323126915116956,
-    2.5455029531981745,
-    0.025446599217177936,
-    0.048271355203287826,
-    1.4867678219453613
-  ],
-  "weights": [
-    0.1567377463711901,
-    -1.5845683110806335,
-    -0.8557710937965766,
-    0.9670290231029263,
-    1.0250871085653546,
-    1.0250447103545444,
-    -2.0287595052389826,
-    0.6779329800951032
-  ],
-  "bias": -0.058943520734125794,
   "classes": [
-    "eyes_closed",
-    "eyes_open"
+    "closed",
+    "open"
   ],
-  "cv_accuracy": 0.625,
-  "cv_type": "Leave-One-Subject-Out",
-  "cv_metrics": {
-    "precision": {
-      "eyes_closed": 0.8571,
-      "eyes_open": 0.5758
-    },
-    "recall": {
-      "eyes_closed": 0.3,
-      "eyes_open": 0.95
-    },
-    "f1": {
-      "eyes_closed": 0.4444,
-      "eyes_open": 0.717
-    },
-    "confusion_matrix": [
-      [
-        12,
-        28
-      ],
-      [
-        2,
-        38
-      ]
+  "prediction_rule": "If decision_function(x) > 0 \u2192 open (normal balance), else \u2192 closed (impaired balance)",
+  "scaler": {
+    "mean": [
+      0.12884556792572224,
+      0.11136093998619306,
+      0.08217374778670732,
+      2.0376234252701604,
+      12.80184781158191,
+      125.10615775470566
+    ],
+    "std": [
+      0.045133847327176055,
+      0.03563536555948225,
+      0.05982481199494128,
+      1.8077324941978443,
+      37.799432270925315,
+      32.934124185713905
     ]
   },
-  "per_subject_accuracy": [
-    {
-      "subject": "Sophia",
-      "accuracy": 0.525
-    },
-    {
-      "subject": "Syed",
-      "accuracy": 0.725
-    }
+  "weights": [
+    -0.7124851687616154,
+    -1.630074510121072,
+    0.4237209760180871,
+    0.33579639354801194,
+    -0.5011842804981861,
+    1.0556923353687635
   ],
-  "dataset_info": {
-    "n_subjects": 2,
-    "subjects": [
-      "Sophia",
-      "Syed"
-    ],
-    "n_windows": 80,
-    "n_eyes_open": 40,
-    "n_eyes_closed": 40,
-    "window_size_sec": 30.0,
-    "sample_rate_hz": 100
+  "bias": -0.21889522234118264,
+  "metadata": {
+    "training_samples": 142,
+    "training_subjects": 9,
+    "cv_accuracy": 0.7394,
+    "cv_precision": 0.7067,
+    "cv_recall": 0.7794,
+    "cv_f1": 0.7413,
+    "cv_auc": 0.7705,
+    "cv_method": "GroupKFold (leave-one-subject-out, 9 folds)",
+    "n_features": 6
   }
 }

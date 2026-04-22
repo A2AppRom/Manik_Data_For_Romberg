@@ -3,18 +3,18 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Romberger — Posture Classification</title>
-  <meta name="description" content="Classify standing vs sitting from smartphone accelerometer data using a logistic regression model trained on the MotionSense dataset.">
-  <meta property="og:title" content="Romberger — Posture Classification">
-  <meta property="og:description" content="Upload accelerometer CSVs and get instant standing/sitting predictions. Explore the training pipeline, dataset, and model performance.">
+  <title>Romberger — Balance Assessment</title>
+  <meta name="description" content="Classify normal vs impaired balance from smartphone accelerometer data using an SVM model trained on Romberg test recordings.">
+  <meta property="og:title" content="Romberger — Balance Assessment">
+  <meta property="og:description" content="Upload accelerometer CSVs and get instant balance predictions (eyes open vs closed). Explore the training pipeline, dataset, and model performance.">
   <meta property="og:type" content="website">
   <meta name="twitter:card" content="summary">
-  <meta name="twitter:title" content="Romberger — Posture Classification">
-  <meta name="twitter:description" content="Interactive posture classifier with accelerometer data. Upload CSVs, explore the ML pipeline, and test predictions client-side.">
+  <meta name="twitter:title" content="Romberger — Balance Assessment">
+  <meta name="twitter:description" content="Romberg balance test classifier. Upload accelerometer CSVs to assess normal vs impaired balance (eyes open vs closed).">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='30' r='12' fill='%232d5a3d'/><line x1='50' y1='42' x2='50' y2='72' stroke='%232d5a3d' stroke-width='6' stroke-linecap='round'/><line x1='50' y1='72' x2='35' y2='95' stroke='%232d5a3d' stroke-width='5' stroke-linecap='round'/><line x1='50' y1='72' x2='65' y2='95' stroke='%232d5a3d' stroke-width='5' stroke-linecap='round'/><line x1='50' y1='52' x2='30' y2='62' stroke='%232d5a3d' stroke-width='5' stroke-linecap='round'/><line x1='50' y1='52' x2='70' y2='62' stroke='%232d5a3d' stroke-width='5' stroke-linecap='round'/></svg>">
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,400;0,500;0,700;1,400&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     :root {
@@ -27,12 +27,10 @@
       --border: #e0dbd5;
       --radius: 14px;
       --shadow: 0 2px 20px rgba(0,0,0,0.04);
-      --standing-color: #2980b9;
-      --sitting-color: #c0392b;
-      --open-color: #2980b9;
-      --open-bg: rgba(41,128,185,.08);
-      --closed-color: #c0392b;
-      --closed-bg: rgba(192,57,43,.08);
+      --open-color: #27ae60;
+      --open-bg: rgba(39,174,96,.08);
+      --closed-color: #e67e22;
+      --closed-bg: rgba(230,126,34,.08);
     }
 
     [data-theme="dark"] {
@@ -44,10 +42,8 @@
       --accent-light: rgba(74,157,107,.12);
       --border: #3a3a42;
       --shadow: 0 2px 20px rgba(0,0,0,0.2);
-      --standing-color: #5ba8d4;
-      --sitting-color: #d4635a;
-      --open-color: #5ba8d4;
-      --open-bg: rgba(91,168,212,.1);
+      --open-color: #4a9d6b;
+      --open-bg: rgba(74,157,107,.1);
       --closed-color: #d4635a;
       --closed-bg: rgba(212,99,90,.1);
     }
@@ -307,8 +303,8 @@
     .feat-bar-group { flex: 1; display: flex; flex-direction: column; gap: .25rem; }
     .feat-bar-track { height: 14px; border-radius: 7px; background: var(--bg); overflow: hidden; position: relative; display: flex; align-items: center; }
     .feat-bar-fill { height: 100%; border-radius: 7px; transition: width .6s ease; }
-    .feat-bar-fill.standing { background: rgba(41,128,185,.5); }
-    .feat-bar-fill.sitting { background: rgba(192,57,43,.5); }
+    .feat-bar-fill.open { background: rgba(39,174,96,.5); }
+    .feat-bar-fill.closed { background: rgba(230,126,34,.5); }
     .feat-bar-val { position: absolute; right: 6px; font-size: .62rem; font-weight: 600; color: var(--text); }
 
     /* Info cards */
@@ -337,8 +333,8 @@
 
     /* Badge */
     .badge { display: inline-flex; align-items: center; gap: .4rem; padding: .3rem .9rem; border-radius: 99px; font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; }
-    .badge-standing { background: rgba(41,128,185,.12); color: var(--standing-color); }
-    .badge-sitting { background: rgba(192,57,43,.12); color: var(--sitting-color); }
+    .badge-open { background: var(--open-bg); color: var(--open-color); }
+    .badge-closed { background: var(--closed-bg); color: var(--closed-color); }
 
     /* Model badge */
     .model-badge {
@@ -462,14 +458,13 @@
 <body>
 
 <nav role="navigation" aria-label="Main navigation">
-  <div class="logo">Romberger <span>posture</span></div>
+  <div class="logo">Romberger <span>balance</span></div>
   <div class="nav-right">
     <div class="nav-links">
       <a href="#dataset-section">Dataset</a>
       <a href="#performance-section">Performance</a>
       <a href="#pipeline-section">Pipeline</a>
       <a href="#predict-section">Predict</a>
-      <a href="#romberg-section">Romberg</a>
       <a href="learn.html">Learn</a>
     </div>
     <button class="theme-toggle" id="themeToggle" aria-label="Toggle dark mode" title="Toggle dark mode">
@@ -482,8 +477,8 @@
 <!-- Hero -->
 <section class="hero">
   <canvas id="heroCanvas"></canvas>
-  <h1>Classify posture from<br>phone accelerometer data</h1>
-  <p>Trained on the MotionSense dataset, this classifier uses smartphone accelerometer readings to determine whether a person was <strong>standing</strong> or <strong>sitting</strong> during a recording.</p>
+  <h1>Assess balance from<br>phone accelerometer data</h1>
+  <p>Using the Romberg test, this classifier analyzes smartphone accelerometer recordings to determine whether a person was standing with <strong>eyes open</strong> (normal balance) or <strong>eyes closed</strong> (impaired balance).</p>
   <div class="hero-buttons">
     <a href="#predict-section" class="btn-primary">Try it with your data</a>
     <button class="btn-secondary" id="btnDemo">Try a demo</button>
@@ -496,19 +491,19 @@
     <div class="step reveal">
       <div class="step-number">1</div>
       <h4>Record</h4>
-      <p>Use Sensor Logger or any accelerometer app to capture motion data while standing or sitting.</p>
+      <p>Use Sensor Logger to record 30 seconds of standing still with eyes open or closed.</p>
     </div>
     <div class="step-connector"></div>
     <div class="step reveal reveal-delay-1">
       <div class="step-number">2</div>
       <h4>Upload</h4>
-      <p>Export the CSV and drop it into the predict section below.</p>
+      <p>Export the accelerometer CSV and drop it into the predict section below.</p>
     </div>
     <div class="step-connector"></div>
     <div class="step reveal reveal-delay-2">
       <div class="step-number">3</div>
       <h4>Classify</h4>
-      <p>The model extracts 8 features and predicts standing or sitting instantly in your browser.</p>
+      <p>The model extracts 6 features and predicts normal vs impaired balance instantly in your browser.</p>
     </div>
   </div>
 </div>
@@ -516,73 +511,53 @@
 <!-- 1. Dataset Section -->
 <section id="dataset-section">
   <p class="section-label reveal">Dataset</p>
-  <h2 class="section-title reveal">MotionSense training data</h2>
-  <p class="section-desc reveal">The model was trained on the MotionSense dataset published by Malekzadeh et al. &#8212; accelerometer and gyroscope data collected from an iPhone 6s at 50 Hz, with 24 subjects performing various activities.</p>
+  <h2 class="section-title reveal">Romberg test training data</h2>
+  <p class="section-desc reveal">The model was trained on accelerometer recordings collected from 9 subjects using the Sensor Logger app at ~100 Hz. Each subject stood still for 30 seconds with eyes open (normal balance) and eyes closed (impaired balance).</p>
 
   <div class="dataset-stats" style="margin-top:1.5rem">
-    <div class="stat-card"><div class="stat-num">24</div><div class="stat-lbl">Subjects</div></div>
-    <div class="stat-card"><div class="stat-num">96</div><div class="stat-lbl">CSV files loaded</div></div>
-    <div class="stat-card"><div class="stat-num">50 Hz</div><div class="stat-lbl">Sampling rate</div></div>
-    <div class="stat-card"><div class="stat-num">12</div><div class="stat-lbl">Sensor columns</div></div>
-  </div>
-
-  <div class="chart-card" style="margin-top:1.5rem">
-    <h4>Data structure</h4>
-    <p class="chart-sub">Each CSV contains 12 columns of device motion data. We use the 3 userAcceleration columns (x, y, z) for classification.</p>
-    <table class="metrics-table">
-      <thead><tr><th>Group</th><th>Columns</th><th>Used</th></tr></thead>
-      <tbody>
-        <tr><td>Attitude</td><td>attitude.roll, attitude.pitch, attitude.yaw</td><td style="color:var(--text-muted)">No</td></tr>
-        <tr><td>Gravity</td><td>gravity.x, gravity.y, gravity.z</td><td style="color:var(--text-muted)">No</td></tr>
-        <tr><td>Rotation Rate</td><td>rotationRate.x, rotationRate.y, rotationRate.z</td><td style="color:var(--text-muted)">No</td></tr>
-        <tr><td style="font-weight:600;color:var(--accent)">User Acceleration</td><td style="font-weight:600">userAcceleration.x, .y, .z</td><td style="font-weight:600;color:var(--accent)">Yes</td></tr>
-      </tbody>
-    </table>
+    <div class="stat-card"><div class="stat-num">9</div><div class="stat-lbl">Subjects</div></div>
+    <div class="stat-card"><div class="stat-num">142</div><div class="stat-lbl">30s recordings</div></div>
+    <div class="stat-card"><div class="stat-num">~100 Hz</div><div class="stat-lbl">Sampling rate</div></div>
+    <div class="stat-card"><div class="stat-num">6</div><div class="stat-lbl">Features extracted</div></div>
   </div>
 
   <div class="charts-row" style="margin-top:1.5rem">
     <div class="chart-card">
-      <h4>Activity trials used</h4>
-      <p class="chart-sub">4 trials from 2 activities, 24 subjects each</p>
+      <h4>Data collection</h4>
+      <p class="chart-sub">Recordings from 9 subjects, split into 30-second chunks</p>
       <table class="metrics-table">
-        <thead><tr><th>Trial</th><th>Activity</th><th>Subjects</th><th>~Duration</th></tr></thead>
+        <thead><tr><th>Subject</th><th>Condition</th><th>Recordings</th></tr></thead>
         <tbody>
-          <tr><td><span class="badge badge-standing">std_6</span></td><td>Standing</td><td>24</td><td>~200s</td></tr>
-          <tr><td><span class="badge badge-standing">std_14</span></td><td>Standing</td><td>24</td><td>~50s</td></tr>
-          <tr><td><span class="badge badge-sitting">sit_5</span></td><td>Sitting</td><td>24</td><td>~200s</td></tr>
-          <tr><td><span class="badge badge-sitting">sit_13</span></td><td>Sitting</td><td>24</td><td>~200s</td></tr>
+          <tr><td>Jack (subject_09)</td><td><span class="badge badge-open">Open</span> / <span class="badge badge-closed">Closed</span></td><td>61 chunks</td></tr>
+          <tr><td>Igor (subject_05)</td><td><span class="badge badge-open">Open</span> / <span class="badge badge-closed">Closed</span></td><td>45 chunks</td></tr>
+          <tr><td>Syed (subject_06)</td><td><span class="badge badge-open">Open</span> / <span class="badge badge-closed">Closed</span></td><td>24 chunks</td></tr>
+          <tr><td>6 others</td><td><span class="badge badge-open">Open</span> / <span class="badge badge-closed">Closed</span></td><td>12 chunks</td></tr>
         </tbody>
       </table>
     </div>
     <div class="chart-card">
-      <h4>Windowing &amp; features</h4>
+      <h4>Feature extraction</h4>
       <p class="chart-sub">How raw data becomes model input</p>
       <div style="font-size:.84rem;color:var(--text-muted);line-height:1.7">
-        <p><strong style="color:var(--text)">1. Segment</strong> each file into 30-second windows (1500 samples) with 50% overlap</p>
-        <p style="margin-top:.5rem"><strong style="color:var(--text)">2. Extract</strong> 8 statistical features per window:</p>
+        <p><strong style="color:var(--text)">1. Clean</strong> raw recordings &#8212; trim phone-handling artifacts from start and end</p>
+        <p style="margin-top:.5rem"><strong style="color:var(--text)">2. Chunk</strong> longer recordings into 30-second segments (~3000 samples each)</p>
+        <p style="margin-top:.5rem"><strong style="color:var(--text)">3. Extract</strong> 6 statistical features per chunk from sway magnitude:</p>
         <ul style="margin:.4rem 0 .5rem 1.2rem">
-          <li>RMS sway (magnitude intensity)</li>
-          <li>Std dev X, Y, Z (directional variability)</li>
-          <li>Mean jerk (movement smoothness)</li>
-          <li>Path length (total displacement)</li>
-          <li>Sway mean &amp; peak (magnitude stats)</li>
+          <li>Mean &amp; Median (central sway tendency)</li>
+          <li>Standard Deviation (sway variability)</li>
+          <li>Skewness &amp; Kurtosis (distribution shape)</li>
+          <li>Path Length (cumulative movement)</li>
         </ul>
-        <p><strong style="color:var(--text)">3. Classify</strong> with logistic regression</p>
+        <p><strong style="color:var(--text)">4. Classify</strong> with SVM (linear kernel)</p>
       </div>
     </div>
   </div>
 
   <div class="dataset-stats" style="margin-top:1.5rem">
-    <div class="stat-card"><div class="stat-num">812</div><div class="stat-lbl">Total windows</div></div>
-    <div class="stat-card"><div class="stat-num">386</div><div class="stat-lbl">Standing windows</div></div>
-    <div class="stat-card"><div class="stat-num">426</div><div class="stat-lbl">Sitting windows</div></div>
-    <div class="stat-card"><div class="stat-num">8</div><div class="stat-lbl">Features extracted</div></div>
-  </div>
-
-  <div class="chart-card" style="margin-top:1.5rem">
-    <h4>Subject demographics</h4>
-    <p class="chart-sub">24 subjects aged 18&#8211;46, varied height and weight, 14 male / 10 female</p>
-    <canvas id="demographicsChart" height="180"></canvas>
+    <div class="stat-card"><div class="stat-num">142</div><div class="stat-lbl">Total samples</div></div>
+    <div class="stat-card"><div class="stat-num">68</div><div class="stat-lbl">Eyes open</div></div>
+    <div class="stat-card"><div class="stat-num">74</div><div class="stat-lbl">Eyes closed</div></div>
+    <div class="stat-card"><div class="stat-num">6</div><div class="stat-lbl">Features per sample</div></div>
   </div>
 </section>
 
@@ -590,27 +565,28 @@
 <section id="performance-section">
   <p class="section-label reveal">Performance</p>
   <h2 class="section-title reveal">Model evaluation</h2>
-  <p class="section-desc reveal">Logistic regression evaluated with leave-one-subject-out cross-validation &#8212; the model never sees data from the test subject during training.</p>
+  <p class="section-desc reveal">SVM (linear kernel) evaluated with leave-one-subject-out cross-validation using GroupKFold &#8212; each fold holds out all recordings from one subject, ensuring the model never trains on the test subject's data.</p>
 
   <div class="accuracy-card">
-    <div class="accuracy-big">91.5%</div>
-    <div class="accuracy-label">Leave-one-subject-out cross-validation accuracy</div>
+    <div class="accuracy-big">73.9%</div>
+    <div class="accuracy-label">Leave-one-subject-out cross-validation accuracy (9 folds)</div>
+    <div class="model-badge" style="margin-top:.8rem"><span class="dot"></span> SVM Linear &#8212; balanced class weights, StandardScaler</div>
   </div>
 
   <div class="charts-row" style="margin-top:1.5rem">
     <div class="chart-card" style="text-align:center">
       <h4>Confusion matrix</h4>
-      <p class="chart-sub">Predicted vs actual across all 24 CV folds</p>
+      <p class="chart-sub">Predicted vs actual across all 9 LOSO CV folds</p>
       <div class="confusion-grid">
         <div></div>
-        <div class="header">Pred. Sitting</div>
-        <div class="header">Pred. Standing</div>
-        <div class="header" style="text-align:right">Actual Sitting</div>
-        <div class="cell cell-correct">394</div>
-        <div class="cell cell-incorrect">32</div>
-        <div class="header" style="text-align:right">Actual Standing</div>
-        <div class="cell cell-incorrect">37</div>
-        <div class="cell cell-correct">349</div>
+        <div class="header">Pred. Closed</div>
+        <div class="header">Pred. Open</div>
+        <div class="header" style="text-align:right">Actual Closed</div>
+        <div class="cell cell-correct">52</div>
+        <div class="cell cell-incorrect">22</div>
+        <div class="header" style="text-align:right">Actual Open</div>
+        <div class="cell cell-incorrect">15</div>
+        <div class="cell cell-correct">53</div>
       </div>
     </div>
     <div class="chart-card">
@@ -619,22 +595,25 @@
       <table class="metrics-table">
         <thead><tr><th>Class</th><th>Precision</th><th>Recall</th><th>F1</th></tr></thead>
         <tbody>
-          <tr><td><span class="badge badge-sitting">Sitting</span></td><td>91.4%</td><td>92.5%</td><td>92.0%</td></tr>
-          <tr><td><span class="badge badge-standing">Standing</span></td><td>91.6%</td><td>90.4%</td><td>91.0%</td></tr>
+          <tr><td><span class="badge badge-closed">Eyes Closed</span></td><td>78%</td><td>70%</td><td>74%</td></tr>
+          <tr><td><span class="badge badge-open">Eyes Open</span></td><td>71%</td><td>78%</td><td>74%</td></tr>
         </tbody>
       </table>
+      <div style="margin-top:1rem;font-size:.82rem;color:var(--text-muted)">
+        <strong style="color:var(--text)">Model choice:</strong> SVM (Linear) was chosen over Logistic Regression and SVM (RBF). It matches the project specification, achieves 73.9% aggregate accuracy, and shows the lowest fold variance (&plusmn;0.21).
+      </div>
     </div>
   </div>
 
   <div class="chart-card" style="margin-top:1.5rem">
     <h4>Per-subject classification accuracy</h4>
-    <p class="chart-sub">Each bar shows accuracy when that subject was held out as the test set</p>
+    <p class="chart-sub">Each bar shows accuracy when that subject was held out (LOSO). Small folds (n=2) are coin-flip volatile.</p>
     <canvas id="perSubjectChart" height="200"></canvas>
   </div>
 
   <div class="chart-card" style="margin-top:1.5rem">
     <h4>Feature importance</h4>
-    <p class="chart-sub">Absolute logistic regression coefficient &#8212; higher means more influential for the classification decision</p>
+    <p class="chart-sub">Absolute SVM weight &#8212; higher means more influential for the classification decision</p>
     <canvas id="featureImportanceChart" height="200"></canvas>
   </div>
 </section>
@@ -643,82 +622,80 @@
 <section id="pipeline-section">
   <p class="section-label reveal">Pipeline</p>
   <h2 class="section-title reveal">Training pipeline</h2>
-  <p class="section-desc reveal">The complete Python notebook used to load data, extract features, train the model, and export weights. Download and run it yourself, or read through below.</p>
+  <p class="section-desc reveal">The Python scripts used to consolidate data, extract features, compare models, and train the final SVM classifier. The pipeline runs as standalone scripts.</p>
 
-  <div class="nb-download-row" style="margin-top:1.5rem">
-    <div>
-      <div style="font-weight:600;font-size:.9rem">train_model.ipynb</div>
-      <p>Jupyter notebook &#8212; requires Python 3, scikit-learn, pandas, numpy, matplotlib, seaborn</p>
+  <div class="charts-row" style="margin-top:1.5rem">
+    <div class="chart-card">
+      <h4>Data pipeline</h4>
+      <p class="chart-sub">Scripts that prepare raw Sensor Logger data</p>
+      <table class="metrics-table">
+        <thead><tr><th>Script</th><th>Purpose</th></tr></thead>
+        <tbody>
+          <tr><td style="font-weight:600">consolidate_data.py</td><td>Merge recordings from 5 repos into unified structure</td></tr>
+          <tr><td style="font-weight:600">clean_data.py</td><td>Trim phone-handling artifacts from start/end</td></tr>
+          <tr><td style="font-weight:600">chunk_data.py</td><td>Split longer recordings into 30-second segments</td></tr>
+          <tr><td style="font-weight:600">extract_features.py</td><td>Compute 6 features per chunk &#8594; features_dataset.csv</td></tr>
+        </tbody>
+      </table>
     </div>
-    <button class="btn-download" onclick="downloadNotebook()">
-      <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-      Download .ipynb
-    </button>
+    <div class="chart-card">
+      <h4>Model training</h4>
+      <p class="chart-sub">Scripts that train and evaluate the classifier</p>
+      <table class="metrics-table">
+        <thead><tr><th>Script</th><th>Purpose</th></tr></thead>
+        <tbody>
+          <tr><td style="font-weight:600">train_model_comparison.py</td><td>Compare SVM (RBF), SVM (Linear), LogReg with GroupKFold</td></tr>
+          <tr><td style="font-weight:600">train_final_model.py</td><td>Train SVM Linear on all 142 samples, export weights</td></tr>
+        </tbody>
+      </table>
+    </div>
   </div>
-
-  <div id="notebookCells"></div>
 </section>
 
 <!-- 4. Predict Section -->
 <section id="predict-section">
   <p class="section-label reveal">Predict</p>
   <h2 class="section-title reveal">Test it yourself</h2>
-  <p class="section-desc reveal">Upload an accelerometer CSV from Sensor Logger or any recording app. The model will extract the same 8 features and predict what you were doing &#8212; standing or sitting.</p>
-
-  <div class="upload-zone" id="predictZone" role="button" tabindex="0" aria-label="Upload accelerometer CSV for prediction">
-    <div class="zone-icon">
-      <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
-      </svg>
-    </div>
-    <h3>Drop your accelerometer CSV here</h3>
-    <p>Accepts CSV with columns: userAcceleration.x/y/z, or x/y/z, or accelerometerAccelerationX/Y/Z</p>
-  </div>
-  <input type="file" id="predictFile" accept=".csv" style="display:none">
-  <div class="demo-link-row">No data? <a href="#" id="btnDemoPredict">Load a demo CSV</a> to see the classifier in action.</div>
-  <div class="prediction-result" id="predictionResult"></div>
-</section>
-
-<!-- 5. Romberg Test Section -->
-<section id="romberg-section">
-  <p class="section-label reveal">Romberg Test</p>
-  <h2 class="section-title reveal">Eyes open vs. eyes closed</h2>
-  <p class="section-desc reveal">The Romberg test compares postural sway with eyes open versus closed. Upload a Sensor Logger accelerometer CSV recorded while standing still, and the model will predict whether your eyes were open or closed.</p>
+  <p class="section-desc reveal">Upload a Sensor Logger accelerometer CSV recorded while standing still (~30 seconds). The model will compute 6 sway features and predict whether your eyes were <strong>open</strong> (normal balance) or <strong>closed</strong> (impaired balance).</p>
 
   <div class="charts-row" style="margin-top:1.5rem">
-    <div class="chart-card" style="text-align:center">
-      <h4>Model accuracy</h4>
-      <p class="chart-sub">5-fold stratified cross-validation</p>
-      <div class="accuracy-big" style="font-size:2.5rem">62.5%</div>
-      <div class="accuracy-label">Leave-one-subject-out CV, 2 subjects, 80 windows</div>
-      <div class="model-badge" style="margin-top:.8rem"><span class="dot"></span> Early model &#8212; needs more subjects to generalize</div>
-    </div>
     <div class="chart-card">
       <h4>How it works</h4>
-      <p class="chart-sub">Same 8 features, different signal</p>
+      <p class="chart-sub">The Romberg test measures postural sway</p>
       <div style="font-size:.84rem;color:var(--text-muted);line-height:1.7">
-        <p><strong style="color:var(--text)">1. Gravity removal</strong> &#8212; raw accelerometer includes gravity (~1g on one axis). We subtract the per-window mean to isolate the sway component.</p>
-        <p style="margin-top:.5rem"><strong style="color:var(--text)">2. Same 8 features</strong> &#8212; RMS sway, std dev X/Y/Z, mean jerk, path length, sway mean &amp; peak.</p>
+        <p><strong style="color:var(--text)">1. Sway magnitude</strong> &#8212; compute magnitude from accelerometer x, y, z axes to capture total body sway.</p>
+        <p style="margin-top:.5rem"><strong style="color:var(--text)">2. Six features</strong> &#8212; mean, median, std, skewness, kurtosis, and path length of the sway signal.</p>
         <p style="margin-top:.5rem"><strong style="color:var(--text)">3. Key insight</strong> &#8212; eyes closed increases postural sway because the brain loses visual feedback for balance correction.</p>
+      </div>
+    </div>
+    <div class="chart-card" style="text-align:center">
+      <h4>Recording tips</h4>
+      <p class="chart-sub">For best results</p>
+      <div style="font-size:.84rem;color:var(--text-muted);line-height:1.7;text-align:left">
+        <p><strong style="color:var(--text)">App:</strong> Sensor Logger (iOS/Android)</p>
+        <p style="margin-top:.5rem"><strong style="color:var(--text)">Duration:</strong> ~30 seconds of standing still</p>
+        <p style="margin-top:.5rem"><strong style="color:var(--text)">Position:</strong> Hold phone against chest or in pocket</p>
+        <p style="margin-top:.5rem"><strong style="color:var(--text)">Export:</strong> Accelerometer CSV with x, y, z columns</p>
+        <p style="margin-top:.5rem"><strong style="color:var(--text)">Conditions:</strong> Eyes open (normal) or eyes closed (impaired)</p>
       </div>
     </div>
   </div>
 
-  <div class="upload-zone" id="rombergZone" role="button" tabindex="0" aria-label="Upload accelerometer CSV for Romberg test">
+  <div class="upload-zone" id="predictZone" role="button" tabindex="0" aria-label="Upload accelerometer CSV for Romberg balance test">
     <div class="zone-icon">
       <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
       </svg>
     </div>
     <h3>Drop your Sensor Logger CSV here</h3>
-    <p>Accepts CSV with columns: x, y, z (raw accelerometer from Sensor Logger or similar apps)</p>
+    <p>Accepts CSV with columns: x, y, z &#8212; or userAcceleration.x/y/z, or accelerometerAccelerationX/Y/Z</p>
   </div>
-  <input type="file" id="rombergFile" accept=".csv" style="display:none">
-  <div class="demo-link-row">No data? <a href="#" id="btnDemoRomberg">Load a demo CSV</a> to see the Romberg classifier.</div>
-  <div class="prediction-result" id="rombergResult"></div>
+  <input type="file" id="predictFile" accept=".csv" style="display:none">
+  <div class="demo-link-row">No data? <a href="#" id="btnDemoPredict">Load a demo CSV</a> to see the classifier in action.</div>
+  <div class="prediction-result" id="predictionResult"></div>
 </section>
 
-<footer><p>Romberger &#8212; an educational posture classification tool. Not intended for clinical use.</p></footer>
+<footer><p>Romberger &#8212; an educational balance assessment tool using the Romberg test. Not intended for clinical use.</p></footer>
 
 <!-- Toast container -->
 <div class="toast-container" id="toastContainer" aria-live="polite"></div>
@@ -786,31 +763,34 @@ themeToggle.addEventListener('click', () => {
 });
 
 /* ==========================================================
-   EMBEDDED MODEL WEIGHTS (from train_model.ipynb)
+   EMBEDDED MODEL WEIGHTS (from train_final_model.py — SVM Linear)
 ========================================================== */
 const MODEL = {
-  feature_names: ["rms_sway","std_x","std_y","std_z","mean_jerk","path_length","sway_mean","sway_peak"],
-  scaler_mean: [0.04062466885371417,0.01576229271948646,0.0117773305984365,0.013878789467725316,0.47127935880935434,0.0094189608051622,0.03554346977997844,0.19872813428830458],
-  scaler_std: [0.029374773140715404,0.011415469705973598,0.008618544542422469,0.010213659213333353,0.2765017143599575,0.005525967038185564,0.02836371746808587,0.20877204094918658],
-  weights: [-0.898063726350462,4.834990857032956,-3.3728412485862567,3.1769723614722376,-0.5154483557159912,-0.5154772481874157,1.3270658877286143,-1.794945353482792],
-  bias: 0.5131258282752917,
-  classes: ["sitting","standing"],
+  feature_names: ["mean","median","std","skewness","kurtosis","path_length"],
+  scaler_mean: [0.12884556792572224,0.11136093998619306,0.08217374778670732,2.0376234252701604,12.80184781158191,125.10615775470566],
+  scaler_std: [0.045133847327176055,0.03563536555948225,0.05982481199494128,1.8077324941978443,37.799432270925315,32.934124185713905],
+  weights: [-0.7124851687616154,-1.630074510121072,0.4237209760180871,0.33579639354801194,-0.5011842804981861,1.0556923353687635],
+  bias: -0.21889522234118264,
+  classes: ["closed","open"],
   per_subject_accuracy: [
-    {subject:1,accuracy:0.9524},{subject:2,accuracy:1.0},{subject:3,accuracy:0.9167},
-    {subject:4,accuracy:1.0},{subject:5,accuracy:1.0},{subject:6,accuracy:0.9697},
-    {subject:7,accuracy:0.9722},{subject:8,accuracy:0.9722},{subject:9,accuracy:1.0},
-    {subject:10,accuracy:0.9062},{subject:11,accuracy:1.0},{subject:12,accuracy:1.0},
-    {subject:13,accuracy:0.8378},{subject:14,accuracy:0.9722},{subject:15,accuracy:0.9167},
-    {subject:16,accuracy:0.8333},{subject:17,accuracy:1.0},{subject:18,accuracy:0.6774},
-    {subject:19,accuracy:0.6596},{subject:20,accuracy:0.7778},{subject:21,accuracy:0.8611},
-    {subject:22,accuracy:0.9688},{subject:23,accuracy:0.8696},{subject:24,accuracy:0.973}
-  ]
+    {subject:"Person1",accuracy:0.500,n:2},
+    {subject:"Person2",accuracy:1.000,n:2},
+    {subject:"Person3",accuracy:0.500,n:2},
+    {subject:"Person4",accuracy:0.500,n:2},
+    {subject:"Barbara",accuracy:1.000,n:2},
+    {subject:"Igor",accuracy:0.778,n:45},
+    {subject:"Syed",accuracy:0.500,n:24},
+    {subject:"Sadaf",accuracy:0.500,n:2},
+    {subject:"Jack",accuracy:0.820,n:61}
+  ],
+  cv_accuracy: 0.7394,
+  cv_method: "GroupKFold (leave-one-subject-out, 9 folds)"
 };
 
-const SAMPLE_RATE = 50;
+const SAMPLE_RATE = 100;
 const FEATURE_LABELS = {
-  rms_sway: 'RMS Sway', std_x: 'Std Dev X', std_y: 'Std Dev Y', std_z: 'Std Dev Z',
-  mean_jerk: 'Mean Jerk', path_length: 'Path Length', sway_mean: 'Sway Mean', sway_peak: 'Sway Peak',
+  mean: 'Mean Sway', median: 'Median Sway', std: 'Std Dev',
+  skewness: 'Skewness', kurtosis: 'Kurtosis', path_length: 'Path Length',
 };
 
 /* ==========================================================
@@ -832,145 +812,11 @@ function parseCSV(text) {
 }
 
 /* ==========================================================
-   FEATURE EXTRACTION (matches Python exactly)
+   FEATURE EXTRACTION (matches Python extract_features.py)
+   Features: mean, median, std, skewness, kurtosis, path_length
+   Computed from sway magnitude = sqrt(x² + y² + z²)
 ========================================================== */
 function extractFeatures(rows) {
-  let ax, ay, az;
-  if (rows[0].hasOwnProperty('userAcceleration.x')) {
-    ax = rows.map(r => r['userAcceleration.x']);
-    ay = rows.map(r => r['userAcceleration.y']);
-    az = rows.map(r => r['userAcceleration.z']);
-  } else if (rows[0].hasOwnProperty('x')) {
-    ax = rows.map(r => r['x']);
-    ay = rows.map(r => r['y']);
-    az = rows.map(r => r['z']);
-  } else {
-    const keys = Object.keys(rows[0]);
-    const xCol = keys.find(k => /accel.*x/i.test(k));
-    const yCol = keys.find(k => /accel.*y/i.test(k));
-    const zCol = keys.find(k => /accel.*z/i.test(k));
-    if (xCol && yCol && zCol) {
-      ax = rows.map(r => r[xCol]);
-      ay = rows.map(r => r[yCol]);
-      az = rows.map(r => r[zCol]);
-    } else {
-      return null;
-    }
-  }
-
-  const n = ax.length;
-  if (n < 10) return null;
-
-  const mag = ax.map((x, i) => Math.sqrt(x*x + ay[i]*ay[i] + az[i]*az[i]));
-  const mean = arr => arr.reduce((s, v) => s + v, 0) / arr.length;
-  const std = arr => { const m = mean(arr); return Math.sqrt(arr.reduce((s, v) => s + (v - m)**2, 0) / arr.length); };
-
-  const jerk = [];
-  for (let i = 1; i < n; i++) {
-    const dx = ax[i]-ax[i-1], dy = ay[i]-ay[i-1], dz = az[i]-az[i-1];
-    jerk.push(Math.sqrt(dx*dx + dy*dy + dz*dz) * SAMPLE_RATE);
-  }
-
-  let pathLen = 0;
-  for (let i = 1; i < n; i++) {
-    pathLen += Math.sqrt((ax[i]-ax[i-1])**2 + (ay[i]-ay[i-1])**2 + (az[i]-az[i-1])**2);
-  }
-
-  return {
-    features: {
-      rms_sway: Math.sqrt(mag.reduce((s, v) => s + v*v, 0) / n),
-      std_x: std(ax),
-      std_y: std(ay),
-      std_z: std(az),
-      mean_jerk: mean(jerk),
-      path_length: pathLen / n,
-      sway_mean: mean(mag),
-      sway_peak: Math.max(...mag),
-    },
-    accelData: { ax, ay, az },
-  };
-}
-
-/* ==========================================================
-   PREDICTION (logistic regression with embedded weights)
-========================================================== */
-function predict(features) {
-  const { weights, bias, scaler_mean, scaler_std, feature_names, classes } = MODEL;
-  let z = bias;
-  for (let i = 0; i < feature_names.length; i++) {
-    const scaled = (features[feature_names[i]] - scaler_mean[i]) / scaler_std[i];
-    z += weights[i] * scaled;
-  }
-  const prob = 1 / (1 + Math.exp(-z));
-  return {
-    label: prob > 0.5 ? 'standing' : 'sitting',
-    confidence: Math.max(prob, 1 - prob),
-    probStanding: prob,
-  };
-}
-
-/* ==========================================================
-   DEMO DATA GENERATOR
-========================================================== */
-function generateDemoCSV(posture) {
-  const hz = 50, duration = 30;
-  const n = hz * duration;
-
-  // Standing: more sway; Sitting: less movement
-  const amp = posture === 'standing' ? 0.035 : 0.008;
-  const noiseScale = posture === 'standing' ? 0.02 : 0.005;
-
-  function gaussRand() {
-    let u = 0, v = 0;
-    while (u === 0) u = Math.random();
-    while (v === 0) v = Math.random();
-    return Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
-  }
-
-  let csv = 'userAcceleration.x,userAcceleration.y,userAcceleration.z\n';
-  for (let i = 0; i < n; i++) {
-    const t = i / hz;
-    const x = amp * Math.sin(2*Math.PI*0.3*t + Math.random()*0.1) + noiseScale * gaussRand();
-    const y = amp * Math.sin(2*Math.PI*0.25*t + 0.8) + noiseScale * gaussRand();
-    const z = amp * 0.3 * Math.sin(2*Math.PI*0.15*t) + noiseScale * 0.5 * gaussRand();
-    csv += `${x.toFixed(6)},${y.toFixed(6)},${z.toFixed(6)}\n`;
-  }
-  return csv;
-}
-
-function loadDemoData() {
-  // Randomly pick standing or sitting for surprise
-  const posture = Math.random() > 0.5 ? 'standing' : 'sitting';
-  const csvText = generateDemoCSV(posture);
-  const { rows } = parseCSV(csvText);
-  const extracted = extractFeatures(rows);
-  if (!extracted) { showToast('Demo generation failed.', 'error'); return; }
-  const { features, accelData } = extracted;
-  const result = predict(features);
-  showPrediction(result, features, `demo_${posture}.csv`, rows.length, accelData);
-  showToast(`Demo loaded! (generated ${posture} data)`, 'success');
-  document.getElementById('predict-section').scrollIntoView({ behavior: 'smooth' });
-}
-
-document.getElementById('btnDemo').addEventListener('click', loadDemoData);
-document.getElementById('btnDemoPredict').addEventListener('click', (e) => { e.preventDefault(); loadDemoData(); });
-
-/* ==========================================================
-   ROMBERG MODEL (eyes open vs eyes closed)
-========================================================== */
-const ROMBERG_MODEL = {
-  feature_names: ["rms_sway","std_x","std_y","std_z","mean_jerk","path_length","sway_mean","sway_peak"],
-  scaler_mean: [0.12634987791657074,0.0507540300441189,0.06047212082272496,0.09752990021270959,5.955201503987418,0.05953183030033423,0.10078048032413889,0.7537447474340783],
-  scaler_std: [0.09417262054238536,0.03844264806999143,0.04740451180224844,0.07323126915116956,2.5455029531981745,0.025446599217177936,0.048271355203287826,1.4867678219453613],
-  weights: [0.1567377463711901,-1.5845683110806335,-0.8557710937965766,0.9670290231029263,1.0250871085653546,1.0250447103545444,-2.0287595052389826,0.6779329800951032],
-  bias: -0.058943520734125794,
-  classes: ["eyes_closed","eyes_open"],
-};
-
-const ROMBERG_SAMPLE_RATE = 100;
-
-function extractFeaturesRomberg(rows) {
-  // Detect columns — Sensor Logger: x, y, z (with gravity)
   let ax, ay, az;
   if (rows[0].hasOwnProperty('x')) {
     ax = rows.map(r => r['x']);
@@ -997,142 +843,101 @@ function extractFeaturesRomberg(rows) {
   const n = ax.length;
   if (n < 10) return null;
 
-  // Auto-detect sample rate from seconds_elapsed column if available
-  let sampleRate = ROMBERG_SAMPLE_RATE;
+  // Auto-detect sample rate
+  let sampleRate = SAMPLE_RATE;
   if (rows[0].hasOwnProperty('seconds_elapsed') && n > 2) {
     const totalTime = rows[n-1]['seconds_elapsed'] - rows[0]['seconds_elapsed'];
     if (totalTime > 0) sampleRate = Math.round((n - 1) / totalTime);
   }
 
-  // Remove gravity by subtracting per-window mean
-  const mean = arr => arr.reduce((s, v) => s + v, 0) / arr.length;
-  const meanAx = mean(ax), meanAy = mean(ay), meanAz = mean(az);
-  ax = ax.map(v => v - meanAx);
-  ay = ay.map(v => v - meanAy);
-  az = az.map(v => v - meanAz);
+  // Detect if gravity is present (raw accelerometer ≈ 9.81 magnitude)
+  const rawMag = ax.map((x, i) => Math.sqrt(x*x + ay[i]*ay[i] + az[i]*az[i]));
+  const rawMagMean = rawMag.reduce((s, v) => s + v, 0) / n;
 
-  const std = arr => { const m = mean(arr); return Math.sqrt(arr.reduce((s, v) => s + (v - m)**2, 0) / arr.length); };
-  const mag = ax.map((x, i) => Math.sqrt(x*x + ay[i]*ay[i] + az[i]*az[i]));
-
-  const jerk = [];
-  for (let i = 1; i < n; i++) {
-    const dx = ax[i]-ax[i-1], dy = ay[i]-ay[i-1], dz = az[i]-az[i-1];
-    jerk.push(Math.sqrt(dx*dx + dy*dy + dz*dz) * sampleRate);
+  let mag;
+  if (rawMagMean > 5) {
+    // Gravity present — subtract per-axis mean to isolate sway
+    const meanFn = arr => arr.reduce((s, v) => s + v, 0) / arr.length;
+    const mAx = meanFn(ax), mAy = meanFn(ay), mAz = meanFn(az);
+    const dAx = ax.map(v => v - mAx);
+    const dAy = ay.map(v => v - mAy);
+    const dAz = az.map(v => v - mAz);
+    mag = dAx.map((x, i) => Math.sqrt(x*x + dAy[i]*dAy[i] + dAz[i]*dAz[i]));
+  } else {
+    // Already linear acceleration (gravity-free)
+    mag = rawMag;
   }
 
-  let pathLen = 0;
+  // Compute 6 features (matching scipy.stats for skewness/kurtosis)
+  const meanVal = mag.reduce((s, v) => s + v, 0) / n;
+
+  const sorted = [...mag].sort((a, b) => a - b);
+  const medianVal = n % 2 === 0 ? (sorted[n/2 - 1] + sorted[n/2]) / 2 : sorted[Math.floor(n/2)];
+
+  const variance = mag.reduce((s, v) => s + (v - meanVal)**2, 0) / n;
+  const stdVal = Math.sqrt(variance);
+
+  // Skewness: m3 / m2^(3/2) — matches scipy.stats.skew(bias=True)
+  const m3 = mag.reduce((s, v) => s + (v - meanVal)**3, 0) / n;
+  const skewnessVal = stdVal > 0 ? m3 / (stdVal ** 3) : 0;
+
+  // Kurtosis: m4 / m2^2 - 3 — matches scipy.stats.kurtosis(fisher=True, bias=True)
+  const m4 = mag.reduce((s, v) => s + (v - meanVal)**4, 0) / n;
+  const kurtosisVal = variance > 0 ? (m4 / (variance ** 2)) - 3 : 0;
+
+  // Path length: sum of |diff(mag)|
+  let pathLength = 0;
   for (let i = 1; i < n; i++) {
-    pathLen += Math.sqrt((ax[i]-ax[i-1])**2 + (ay[i]-ay[i-1])**2 + (az[i]-az[i-1])**2);
+    pathLength += Math.abs(mag[i] - mag[i-1]);
   }
 
   return {
     features: {
-      rms_sway: Math.sqrt(mag.reduce((s, v) => s + v*v, 0) / n),
-      std_x: std(ax),
-      std_y: std(ay),
-      std_z: std(az),
-      mean_jerk: mean(jerk),
-      path_length: pathLen / n,
-      sway_mean: mean(mag),
-      sway_peak: Math.max(...mag),
+      mean: meanVal,
+      median: medianVal,
+      std: stdVal,
+      skewness: skewnessVal,
+      kurtosis: kurtosisVal,
+      path_length: pathLength,
     },
-    sampleRate: sampleRate,
+    sampleRate,
     accelData: { ax, ay, az },
   };
 }
 
-function predictRomberg(features) {
-  const { weights, bias, scaler_mean, scaler_std, feature_names, classes } = ROMBERG_MODEL;
-  let z = bias;
+/* ==========================================================
+   PREDICTION (SVM linear decision function)
+   score = w · x_scaled + bias
+   If score > 0 → open (normal), else → closed (impaired)
+========================================================== */
+function predict(features) {
+  const { weights, bias, scaler_mean, scaler_std, feature_names, classes } = MODEL;
+  let score = bias;
   for (let i = 0; i < feature_names.length; i++) {
     const scaled = (features[feature_names[i]] - scaler_mean[i]) / scaler_std[i];
-    z += weights[i] * scaled;
+    score += weights[i] * scaled;
   }
-  const prob = 1 / (1 + Math.exp(-z));
+  // Use sigmoid of score as confidence proxy
+  const prob = 1 / (1 + Math.exp(-score));
+  const label = score > 0 ? 'open' : 'closed';
   return {
-    label: prob > 0.5 ? classes[1] : classes[0],
+    label,
     confidence: Math.max(prob, 1 - prob),
     probOpen: prob,
+    score,
   };
 }
 
-function showRombergPrediction(result, features, filename, sampleCount, accelData, detectedRate) {
-  const rate = detectedRate || ROMBERG_SAMPLE_RATE;
-  if (window._rombergAnimator) { window._rombergAnimator.destroy(); window._rombergAnimator = null; }
-
-  const el = document.getElementById('rombergResult');
-  el.classList.add('visible');
-
-  const isOpen = result.label === 'eyes_open';
-  const color = isOpen ? 'var(--open-color)' : 'var(--closed-color)';
-  const icon = isOpen ? '&#128065;' : '&#128564;';
-  const labelText = isOpen ? 'EYES OPEN' : 'EYES CLOSED';
-  const duration = (sampleCount / rate).toFixed(1);
-
-  let featHtml = '';
-  ROMBERG_MODEL.feature_names.forEach(f => {
-    featHtml += `<div class="pred-feat-row"><span class="pred-feat-label">${FEATURE_LABELS[f]}</span><span class="pred-feat-val">${features[f].toFixed(5)}</span></div>`;
-  });
-
-  el.innerHTML = `
-    <div style="font-size:2rem">${icon}</div>
-    <div class="prediction-label" style="color:${color}">${labelText}</div>
-    <div class="prediction-confidence">
-      Confidence: ${(result.confidence * 100).toFixed(1)}% &nbsp;|&nbsp;
-      P(eyes open): ${(result.probOpen * 100).toFixed(1)}% &nbsp;|&nbsp;
-      ${filename} &nbsp;|&nbsp; ${sampleCount} samples (~${duration}s)
-    </div>
-    <div class="prediction-features">
-      <h4 style="font-family:'Instrument Serif',serif;font-size:1rem;margin-bottom:.5rem">Extracted features</h4>
-      ${featHtml}
-    </div>
-    <div class="stick-animation-card" id="rombergAnimationCard">
-      <h4>Movement Replay</h4>
-      <p class="chart-sub">Stick figure animated with your actual accelerometer data</p>
-      <canvas id="rombergStickCanvas"></canvas>
-      <div class="stick-controls">
-        <button class="stick-btn" id="rombergPlayPause" aria-label="Play/Pause">
-          <svg id="rombergIconPause" viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
-          <svg id="rombergIconPlay" viewBox="0 0 24 24" style="display:none"><polygon points="6,4 20,12 6,20"/></svg>
-        </button>
-        <div class="stick-scrubber-wrap">
-          <input type="range" id="rombergScrubber" min="0" max="1000" value="0" class="stick-scrubber">
-        </div>
-        <span class="stick-time" id="rombergTime">0.0s / ${duration}s</span>
-        <select class="stick-speed" id="rombergSpeed">
-          <option value="0.5">0.5x</option>
-          <option value="1" selected>1x</option>
-          <option value="2">2x</option>
-        </select>
-      </div>
-    </div>
-  `;
-
-  if (accelData) {
-    const canvas = document.getElementById('rombergStickCanvas');
-    const animator = new StickFigureAnimator(canvas, accelData, 'standing', rate, 'romberg');
-    window._rombergAnimator = animator;
-
-    document.getElementById('rombergPlayPause').addEventListener('click', () => animator.togglePlayPause());
-    document.getElementById('rombergScrubber').addEventListener('input', function() {
-      animator.seek(parseFloat(this.value) / 1000);
-    });
-    document.getElementById('rombergSpeed').addEventListener('change', function() {
-      animator.setSpeed(parseFloat(this.value));
-    });
-
-    animator.play();
-  }
-}
-
-function generateRombergDemoCSV(condition) {
+/* ==========================================================
+   DEMO DATA GENERATOR (Romberg test — eyes open vs closed)
+========================================================== */
+function generateDemoCSV(condition) {
   const hz = 100, duration = 30;
   const n = hz * duration;
 
-  // Eyes closed: more sway; Eyes open: less sway (both standing)
-  // These include gravity (~-9.8 on z axis)
-  const amp = condition === 'eyes_closed' ? 0.18 : 0.10;
-  const noiseScale = condition === 'eyes_closed' ? 0.08 : 0.04;
+  // Eyes closed: more sway; Eyes open: less sway
+  const amp = condition === 'closed' ? 0.18 : 0.10;
+  const noiseScale = condition === 'closed' ? 0.08 : 0.04;
 
   function gaussRand() {
     let u = 0, v = 0;
@@ -1146,68 +951,29 @@ function generateRombergDemoCSV(condition) {
     const t = i / hz;
     const x = amp * Math.sin(2*Math.PI*0.3*t + Math.random()*0.1) + noiseScale * gaussRand();
     const y = amp * Math.sin(2*Math.PI*0.25*t + 0.8) + noiseScale * gaussRand();
-    const z = -9.81 + amp * 0.3 * Math.sin(2*Math.PI*0.15*t) + noiseScale * 0.5 * gaussRand();
+    const z = amp * 0.3 * Math.sin(2*Math.PI*0.15*t) + noiseScale * 0.5 * gaussRand();
     csv += `${Date.now() * 1e6},${t.toFixed(6)},${z.toFixed(6)},${y.toFixed(6)},${x.toFixed(6)}\n`;
   }
   return csv;
 }
 
-function loadRombergDemoData() {
-  const condition = Math.random() > 0.5 ? 'eyes_open' : 'eyes_closed';
-  const csvText = generateRombergDemoCSV(condition);
+function loadDemoData() {
+  const condition = Math.random() > 0.5 ? 'open' : 'closed';
+  const csvText = generateDemoCSV(condition);
   const { rows } = parseCSV(csvText);
-  const extracted = extractFeaturesRomberg(rows);
+  const extracted = extractFeatures(rows);
   if (!extracted) { showToast('Demo generation failed.', 'error'); return; }
   const { features, accelData, sampleRate: detectedRate } = extracted;
-  const result = predictRomberg(features);
-  showRombergPrediction(result, features, `demo_${condition}.csv`, rows.length, accelData, detectedRate);
-  showToast(`Romberg demo loaded! (generated ${condition.replace('_', ' ')} data)`, 'success');
-  document.getElementById('romberg-section').scrollIntoView({ behavior: 'smooth' });
+  const result = predict(features);
+  showPrediction(result, features, `demo_eyes_${condition}.csv`, rows.length, accelData, detectedRate);
+  showToast(`Demo loaded! (generated eyes ${condition} data)`, 'success');
+  document.getElementById('predict-section').scrollIntoView({ behavior: 'smooth' });
 }
 
-document.getElementById('btnDemoRomberg').addEventListener('click', (e) => { e.preventDefault(); loadRombergDemoData(); });
+document.getElementById('btnDemo').addEventListener('click', loadDemoData);
+document.getElementById('btnDemoPredict').addEventListener('click', (e) => { e.preventDefault(); loadDemoData(); });
 
-// Romberg file upload
-const rombergZone = document.getElementById('rombergZone');
-const rombergFile = document.getElementById('rombergFile');
-
-rombergZone.addEventListener('click', () => rombergFile.click());
-rombergZone.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); rombergFile.click(); }
-});
-rombergZone.addEventListener('dragover', e => { e.preventDefault(); rombergZone.classList.add('drag-over'); });
-rombergZone.addEventListener('dragleave', () => rombergZone.classList.remove('drag-over'));
-rombergZone.addEventListener('drop', e => {
-  e.preventDefault();
-  rombergZone.classList.remove('drag-over');
-  if (e.dataTransfer.files.length) handleRombergFile(e.dataTransfer.files[0]);
-});
-rombergFile.addEventListener('change', () => {
-  if (rombergFile.files.length) handleRombergFile(rombergFile.files[0]);
-});
-
-function handleRombergFile(file) {
-  const reader = new FileReader();
-  reader.onload = () => {
-    const { rows } = parseCSV(reader.result);
-    if (rows.length < 10) {
-      showToast('CSV has too few rows. Need at least 10 data rows.', 'error');
-      return;
-    }
-
-    const extracted = extractFeaturesRomberg(rows);
-    if (!extracted) {
-      showToast('Could not find acceleration columns. Expected: x/y/z or accelerometerAccelerationX/Y/Z', 'error');
-      return;
-    }
-    const { features, accelData, sampleRate: detectedRate } = extracted;
-
-    const result = predictRomberg(features);
-    showRombergPrediction(result, features, file.name, rows.length, accelData, detectedRate);
-    saveToSupabase(features, result, file.name, reader.result);
-  };
-  reader.readAsText(file);
-}
+/* (Romberg model removed — unified into main MODEL above) */
 
 /* ==========================================================
    CHARTS (render on page load)
@@ -1216,12 +982,12 @@ const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
 const gridColor = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)';
 const tickColor = isDark ? '#9a9590' : '#6b6560';
 
-// Per-subject accuracy
+// Per-subject accuracy (LOSO cross-validation)
 const psData = MODEL.per_subject_accuracy;
 new Chart(document.getElementById('perSubjectChart').getContext('2d'), {
   type: 'bar',
   data: {
-    labels: psData.map(d => `Sub ${d.subject}`),
+    labels: psData.map(d => `${d.subject} (n=${d.n})`),
     datasets: [{
       label: 'Accuracy',
       data: psData.map(d => +(d.accuracy * 100).toFixed(1)),
@@ -1236,12 +1002,12 @@ new Chart(document.getElementById('perSubjectChart').getContext('2d'), {
     plugins: { legend: { display: false } },
     scales: {
       y: { beginAtZero: true, max: 100, title: { display: true, text: 'Accuracy %', font: { family: 'DM Sans' }, color: tickColor }, grid: { color: gridColor }, ticks: { color: tickColor } },
-      x: { grid: { display: false }, ticks: { font: { size: 10 }, color: tickColor } }
+      x: { grid: { display: false }, ticks: { font: { size: 10 }, maxRotation: 45, color: tickColor } }
     }
   }
 });
 
-// Feature importance
+// Feature importance (SVM weight magnitude)
 const absWeights = MODEL.weights.map(Math.abs);
 const sortedIdx = absWeights.map((v, i) => i).sort((a, b) => absWeights[a] - absWeights[b]);
 new Chart(document.getElementById('featureImportanceChart').getContext('2d'), {
@@ -1249,9 +1015,9 @@ new Chart(document.getElementById('featureImportanceChart').getContext('2d'), {
   data: {
     labels: sortedIdx.map(i => FEATURE_LABELS[MODEL.feature_names[i]]),
     datasets: [{
-      label: '|Coefficient|',
+      label: '|Weight|',
       data: sortedIdx.map(i => +absWeights[i].toFixed(4)),
-      backgroundColor: 'rgba(45,90,61,0.6)',
+      backgroundColor: sortedIdx.map(i => MODEL.weights[i] > 0 ? 'rgba(39,174,96,0.6)' : 'rgba(230,126,34,0.6)'),
       borderRadius: 4,
     }]
   },
@@ -1260,48 +1026,8 @@ new Chart(document.getElementById('featureImportanceChart').getContext('2d'), {
     responsive: true,
     plugins: { legend: { display: false } },
     scales: {
-      x: { title: { display: true, text: '|Weight|', font: { family: 'DM Sans' }, color: tickColor }, grid: { color: gridColor }, ticks: { color: tickColor } },
+      x: { title: { display: true, text: '|Weight|  (green = higher → open, orange = higher → closed)', font: { family: 'DM Sans', size: 10 }, color: tickColor }, grid: { color: gridColor }, ticks: { color: tickColor } },
       y: { grid: { display: false }, ticks: { color: tickColor } }
-    }
-  }
-});
-
-// Subject demographics
-const subjects = [
-  {id:1,weight:102,height:188,age:46,gender:'M'},{id:2,weight:72,height:180,age:28,gender:'M'},
-  {id:3,weight:48,height:161,age:28,gender:'F'},{id:4,weight:90,height:176,age:31,gender:'M'},
-  {id:5,weight:48,height:164,age:23,gender:'F'},{id:6,weight:76,height:180,age:28,gender:'M'},
-  {id:7,weight:62,height:175,age:30,gender:'F'},{id:8,weight:52,height:161,age:24,gender:'F'},
-  {id:9,weight:93,height:190,age:32,gender:'M'},{id:10,weight:72,height:164,age:31,gender:'F'},
-  {id:11,weight:70,height:178,age:24,gender:'M'},{id:12,weight:60,height:167,age:33,gender:'M'},
-  {id:13,weight:60,height:178,age:33,gender:'M'},{id:14,weight:70,height:180,age:35,gender:'M'},
-  {id:15,weight:70,height:185,age:33,gender:'M'},{id:16,weight:96,height:172,age:29,gender:'F'},
-  {id:17,weight:76,height:180,age:26,gender:'M'},{id:18,weight:54,height:164,age:26,gender:'F'},
-  {id:19,weight:78,height:164,age:28,gender:'F'},{id:20,weight:88,height:180,age:25,gender:'M'},
-  {id:21,weight:52,height:165,age:24,gender:'M'},{id:22,weight:100,height:186,age:31,gender:'M'},
-  {id:23,weight:68,height:170,age:25,gender:'F'},{id:24,weight:74,height:173,age:18,gender:'F'},
-];
-new Chart(document.getElementById('demographicsChart').getContext('2d'), {
-  type: 'scatter',
-  data: {
-    datasets: [{
-      label: 'Male',
-      data: subjects.filter(s => s.gender === 'M').map(s => ({ x: s.height, y: s.weight })),
-      backgroundColor: 'rgba(41,128,185,0.6)', borderColor: 'rgba(41,128,185,0.8)',
-      pointRadius: 6, pointHoverRadius: 8,
-    }, {
-      label: 'Female',
-      data: subjects.filter(s => s.gender === 'F').map(s => ({ x: s.height, y: s.weight })),
-      backgroundColor: 'rgba(192,57,43,0.5)', borderColor: 'rgba(192,57,43,0.8)',
-      pointRadius: 6, pointHoverRadius: 8,
-    }]
-  },
-  options: {
-    responsive: true,
-    plugins: { legend: { position: 'top', labels: { usePointStyle: true, font: { family: 'DM Sans', size: 11 }, color: tickColor } } },
-    scales: {
-      x: { title: { display: true, text: 'Height (cm)', font: { family: 'DM Sans' }, color: tickColor }, grid: { color: gridColor }, ticks: { color: tickColor } },
-      y: { title: { display: true, text: 'Weight (kg)', font: { family: 'DM Sans' }, color: tickColor }, grid: { color: gridColor }, ticks: { color: tickColor } }
     }
   }
 });
@@ -1339,29 +1065,30 @@ function handleFile(file) {
 
     const extracted = extractFeatures(rows);
     if (!extracted) {
-      showToast('Could not find acceleration columns. Expected: userAcceleration.x/y/z, or x/y/z, or accelerometerAccelerationX/Y/Z', 'error');
+      showToast('Could not find acceleration columns. Expected: x/y/z, userAcceleration.x/y/z, or accelerometerAccelerationX/Y/Z', 'error');
       return;
     }
-    const { features, accelData } = extracted;
+    const { features, accelData, sampleRate: detectedRate } = extracted;
 
     const result = predict(features);
-    showPrediction(result, features, file.name, rows.length, accelData);
+    showPrediction(result, features, file.name, rows.length, accelData, detectedRate);
     saveToSupabase(features, result, file.name, reader.result);
   };
   reader.readAsText(file);
 }
 
-function showPrediction(result, features, filename, sampleCount, accelData) {
-  // Clean up previous animator
+function showPrediction(result, features, filename, sampleCount, accelData, detectedRate) {
+  const rate = detectedRate || SAMPLE_RATE;
   if (window._stickAnimator) { window._stickAnimator.destroy(); window._stickAnimator = null; }
 
   const el = document.getElementById('predictionResult');
   el.classList.add('visible');
 
-  const isStanding = result.label === 'standing';
-  const color = isStanding ? 'var(--standing-color)' : 'var(--sitting-color)';
-  const icon = isStanding ? '&#9650;' : '&#9660;';
-  const duration = (sampleCount / SAMPLE_RATE).toFixed(1);
+  const isOpen = result.label === 'open';
+  const color = isOpen ? 'var(--open-color)' : 'var(--closed-color)';
+  const icon = isOpen ? '&#128065;' : '&#128564;';
+  const labelText = isOpen ? 'EYES OPEN — Normal Balance' : 'EYES CLOSED — Impaired Balance';
+  const duration = (sampleCount / rate).toFixed(1);
 
   let featHtml = '';
   MODEL.feature_names.forEach(f => {
@@ -1369,11 +1096,11 @@ function showPrediction(result, features, filename, sampleCount, accelData) {
   });
 
   el.innerHTML = `
-    <div style="font-size:2rem;color:${color}">${icon}</div>
-    <div class="prediction-label" style="color:${color}">${result.label.toUpperCase()}</div>
+    <div style="font-size:2rem">${icon}</div>
+    <div class="prediction-label" style="color:${color}">${labelText}</div>
     <div class="prediction-confidence">
       Confidence: ${(result.confidence * 100).toFixed(1)}% &nbsp;|&nbsp;
-      P(standing): ${(result.probStanding * 100).toFixed(1)}% &nbsp;|&nbsp;
+      P(eyes open): ${(result.probOpen * 100).toFixed(1)}% &nbsp;|&nbsp;
       ${filename} &nbsp;|&nbsp; ${sampleCount} samples (~${duration}s)
     </div>
     <div class="prediction-features">
@@ -1402,22 +1129,15 @@ function showPrediction(result, features, filename, sampleCount, accelData) {
     </div>
   `;
 
-  // Initialize stick figure animator
   if (accelData) {
     const canvas = document.getElementById('stickCanvas');
-    const animator = new StickFigureAnimator(canvas, accelData, result.label, SAMPLE_RATE, 'stick');
+    const animator = new StickFigureAnimator(canvas, accelData, 'standing', rate, 'stick');
     window._stickAnimator = animator;
 
-    // Play/pause
     document.getElementById('stickPlayPause').addEventListener('click', () => animator.togglePlayPause());
-
-    // Scrubber
-    const scrubber = document.getElementById('stickScrubber');
-    scrubber.addEventListener('input', () => {
-      animator.seek(parseFloat(scrubber.value) / 1000);
+    document.getElementById('stickScrubber').addEventListener('input', function() {
+      animator.seek(parseFloat(this.value) / 1000);
     });
-
-    // Speed
     document.getElementById('stickSpeed').addEventListener('change', function() {
       animator.setSpeed(parseFloat(this.value));
     });
@@ -1454,125 +1174,7 @@ async function saveToSupabase(features, result, filename, rawCsvText) {
   else console.log('Saved to Supabase:', sampleId);
 }
 
-/* ==========================================================
-   NOTEBOOK DOWNLOAD
-========================================================== */
-function downloadNotebook() {
-  fetch('train_model.json')
-    .then(r => r.blob())
-    .then(blob => {
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'train_model.ipynb';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    })
-    .catch(() => {
-      showToast('Could not fetch the notebook file. If opening from file://, please download it manually.', 'info');
-    });
-}
-
-/* ==========================================================
-   NOTEBOOK RENDERER
-========================================================== */
-function renderNotebook(nb) {
-  const container = document.getElementById('notebookCells');
-  container.innerHTML = '';
-  let codeIdx = 0;
-  nb.cells.forEach(cell => {
-    const div = document.createElement('div');
-    div.className = 'nb-cell';
-    if (cell.cell_type === 'markdown') {
-      const src = (Array.isArray(cell.source) ? cell.source.join('') : cell.source);
-      div.innerHTML = '<div class="nb-cell-md">' + mdToHtml(src) + '</div>';
-    } else if (cell.cell_type === 'code') {
-      codeIdx++;
-      const src = (Array.isArray(cell.source) ? cell.source.join('') : cell.source);
-      div.innerHTML =
-        '<div class="nb-cell-code">' +
-          '<div class="nb-cell-code-header">' +
-            '<span class="dot-r"></span><span class="dot-y"></span><span class="dot-g"></span>' +
-            '<span style="margin-left:.3rem">In [' + codeIdx + ']</span>' +
-          '</div>' +
-          '<pre>' + highlightPython(src) + '</pre>' +
-        '</div>';
-    }
-    container.appendChild(div);
-  });
-}
-
-function mdToHtml(md) {
-  return md.split('\n').map(line => {
-    if (/^### /.test(line)) return '<h3>' + inlineMd(line.slice(4)) + '</h3>';
-    if (/^## /.test(line)) return '<h2>' + inlineMd(line.slice(3)) + '</h2>';
-    if (/^# /.test(line)) return '<h1>' + inlineMd(line.slice(2)) + '</h1>';
-    if (/^- /.test(line)) return '<ul><li>' + inlineMd(line.slice(2)) + '</li></ul>';
-    if (line.trim() === '') return '';
-    return '<p>' + inlineMd(line) + '</p>';
-  }).join('\n').replace(/<\/ul>\n<ul>/g, '\n');
-}
-function inlineMd(s) {
-  return s
-    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-    .replace(/`([^`]+)`/g, '<code>$1</code>')
-    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
-    .replace(/\*([^*]+)\*/g, '<em>$1</em>');
-}
-
-function highlightPython(code) {
-  const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-  return esc(code)
-    .replace(/(#.*?)$/gm, '<span class="tok-cmt">$1</span>')
-    .replace(/("""[\s\S]*?"""|'''[\s\S]*?''')/g, '<span class="tok-str">$1</span>')
-    .replace(/(f?'[^'\\]*(?:\\.[^'\\]*)*'|f?"[^"\\]*(?:\\.[^"\\]*)*")/g, '<span class="tok-str">$1</span>')
-    .replace(/(@\w+)/g, '<span class="tok-op">$1</span>')
-    .replace(/\b(import|from|as|def|class|return|if|elif|else|for|while|in|not|and|or|is|with|try|except|raise|pass|break|continue|None|True|False|print|lambda|yield|assert|global|del)\b/g, '<span class="tok-kw">$1</span>')
-    .replace(/\b(\d+\.?\d*(?:e[+-]?\d+)?)\b/g, '<span class="tok-num">$1</span>')
-    .replace(/\b([a-zA-Z_]\w*)\s*(?=\()/g, '<span class="tok-fn">$1</span>');
-}
-
-// Load notebook
-fetch('train_model.json')
-  .then(r => {
-    if (!r.ok) throw new Error();
-    return r.text();
-  })
-  .then(text => {
-    if (text.trim().startsWith('<')) throw new Error('Received HTML instead of JSON');
-    const nb = JSON.parse(text);
-    renderNotebook(nb);
-  })
-  .catch(() => {
-    const container = document.getElementById('notebookCells');
-    container.innerHTML =
-      '<div class="nb-download-row">' +
-        '<div>' +
-          '<div style="font-weight:600;font-size:.9rem">Can\'t auto-load notebook</div>' +
-          '<p>When opening via file://, the browser can\'t read other files. Click below to view it inline, or download the .ipynb above to run in Jupyter.</p>' +
-        '</div>' +
-        '<label class="btn-download" style="cursor:pointer">' +
-          '<svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="15" x2="12" y2="3"/></svg>' +
-          'Load .ipynb' +
-          '<input type="file" accept=".ipynb" style="display:none" id="nbFileInput">' +
-        '</label>' +
-      '</div>';
-    document.getElementById('nbFileInput').addEventListener('change', function() {
-      if (this.files.length) {
-        const reader = new FileReader();
-        reader.onload = () => {
-          try {
-            renderNotebook(JSON.parse(reader.result));
-          } catch(e) {
-            container.innerHTML = '<p style="color:var(--sitting-color)">Error parsing notebook: ' + e.message + '</p>';
-          }
-        };
-        reader.readAsText(this.files[0]);
-      }
-    });
-  });
+/* (Notebook viewer removed — training pipeline uses Python scripts, not notebooks) */
 
 /* ==========================================================
    SCROLL REVEAL (IntersectionObserver)

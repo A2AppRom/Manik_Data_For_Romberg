@@ -1,0 +1,28 @@
+model,fold,held_out_subject,n_test,accuracy,precision,recall,f1
+SVM (RBF kernel),1,subject_09,61,0.623,0.5417,0.963,0.6933
+SVM (RBF kernel),2,subject_05,45,0.6667,0.75,0.5217,0.6154
+SVM (RBF kernel),3,subject_06,24,0.5,0.0,0.0,0.0
+SVM (RBF kernel),4,subject_07,2,0.0,0.0,0.0,0.0
+SVM (RBF kernel),5,subject_04,2,0.5,0.0,0.0,0.0
+SVM (RBF kernel),6,subject_03,2,0.5,0.5,1.0,0.6667
+SVM (RBF kernel),7,subject_02,2,0.5,0.5,1.0,0.6667
+SVM (RBF kernel),8,subject_01,2,1.0,1.0,1.0,1.0
+SVM (RBF kernel),9,subject_00,2,0.0,0.0,0.0,0.0
+SVM (Linear),1,subject_09,61,0.8197,0.7222,0.963,0.8254
+SVM (Linear),2,subject_05,45,0.7778,0.7097,0.9565,0.8148
+SVM (Linear),3,subject_06,24,0.5,0.0,0.0,0.0
+SVM (Linear),4,subject_07,2,0.5,0.5,1.0,0.6667
+SVM (Linear),5,subject_04,2,1.0,1.0,1.0,1.0
+SVM (Linear),6,subject_03,2,0.5,0.5,1.0,0.6667
+SVM (Linear),7,subject_02,2,0.5,0.5,1.0,0.6667
+SVM (Linear),8,subject_01,2,1.0,1.0,1.0,1.0
+SVM (Linear),9,subject_00,2,0.5,0.0,0.0,0.0
+Logistic Regression,1,subject_09,61,0.8361,0.7429,0.963,0.8387
+Logistic Regression,2,subject_05,45,0.8222,0.7419,1.0,0.8519
+Logistic Regression,3,subject_06,24,0.5,0.0,0.0,0.0
+Logistic Regression,4,subject_07,2,0.5,0.5,1.0,0.6667
+Logistic Regression,5,subject_04,2,1.0,1.0,1.0,1.0
+Logistic Regression,6,subject_03,2,0.5,0.5,1.0,0.6667
+Logistic Regression,7,subject_02,2,0.5,0.5,1.0,0.6667
+Logistic Regression,8,subject_01,2,1.0,1.0,1.0,1.0
+Logistic Regression,9,subject_00,2,0.0,0.0,0.0,0.0
