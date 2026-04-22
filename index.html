@@ -681,6 +681,30 @@
     </div>
   </div>
 
+  <fieldset class="label-picker" id="rombergLabelPicker" style="
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1rem 1.25rem;
+      margin-bottom: 1rem;
+      background: var(--surface);
+    ">
+      <legend style="padding: 0 .5rem; font-size: .85rem; color: var(--text-muted);">
+        What condition did you record?
+      </legend>
+      <p style="font-size: .8rem; color: var(--text-muted); margin-bottom: .75rem;">
+        Telling us the ground truth helps the model learn over time.
+        Leave as "Don't know" if you're just testing.
+      </p>
+      <label style="margin-right: 1.5rem; cursor: pointer;">
+        <input type="radio" name="rombergLabel" value="open"> Eyes open
+      </label>
+      <label style="margin-right: 1.5rem; cursor: pointer;">
+        <input type="radio" name="rombergLabel" value="closed"> Eyes closed
+      </label>
+      <label style="cursor: pointer;">
+        <input type="radio" name="rombergLabel" value="" checked> Don't know / testing
+      </label>
+    </fieldset>
   <div class="upload-zone" id="predictZone" role="button" tabindex="0" aria-label="Upload accelerometer CSV for Romberg balance test">
     <div class="zone-icon">
       <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -1054,27 +1078,324 @@ predictFile.addEventListener('change', () => {
   if (predictFile.files.length) handleFile(predictFile.files[0]);
 });
 
+const VALIDATION = {
+  // Hard minimums — below these we refuse the file.
+  MIN_ROWS:              100,      // ~1 second at 100 Hz
+  MIN_DURATION_SECONDS:  10,
+  MAX_DURATION_SECONDS:  120,      // cap to block absurd uploads
+
+  // Soft target — Balance Check Protocol says 30 seconds.
+  // Outside this window we WARN but still accept.
+  TARGET_DURATION_MIN:   20,
+  TARGET_DURATION_MAX:   45,
+
+  // Sampling consistency: coefficient of variation (std/mean)
+  // of inter-sample intervals. Rock-steady sampling ≈ 0.
+  MAX_INTERVAL_CV:       0.25,
+
+  // Sensor Logger defaults ~100 Hz, iOS DeviceMotion ~50 Hz.
+  MIN_SAMPLE_RATE:       20,
+  MAX_SAMPLE_RATE:       500,
+};
+
+/**
+ * Detects the accelerometer x/y/z columns in the CSV header.
+ * Mirrors the same logic as extractFeatures in the main file.
+ */
+function detectAccelColumns(firstRow) {
+  if (!firstRow || typeof firstRow !== 'object') return null;
+
+  if ('x' in firstRow && 'y' in firstRow && 'z' in firstRow) {
+    return { x: 'x', y: 'y', z: 'z' };
+  }
+  if ('userAcceleration.x' in firstRow) {
+    return {
+      x: 'userAcceleration.x',
+      y: 'userAcceleration.y',
+      z: 'userAcceleration.z',
+    };
+  }
+  const keys = Object.keys(firstRow);
+  const xCol = keys.find(k => /accel.*x/i.test(k));
+  const yCol = keys.find(k => /accel.*y/i.test(k));
+  const zCol = keys.find(k => /accel.*z/i.test(k));
+  if (xCol && yCol && zCol) return { x: xCol, y: yCol, z: zCol };
+
+  return null;
+}
+
+/**
+ * Main validator. Returns one of:
+ *   { ok: true,  warnings: [...], meta: {...} }
+ *   { ok: false, error: "...",   warnings: [...] }
+ */
+function validateRombergCSV(rawText) {
+  const warnings = [];
+
+  // --- Parse-level checks ---
+  if (typeof rawText !== 'string' || rawText.length === 0) {
+    return { ok: false, error: 'File is empty.', warnings };
+  }
+
+  if (rawText.indexOf('\0') !== -1) {
+    return {
+      ok: false,
+      error: 'File looks binary, not a CSV. Export a CSV from Sensor Logger.',
+      warnings,
+    };
+  }
+
+  let parsed;
+  try {
+    parsed = parseCSV(rawText);
+  } catch (e) {
+    return {
+      ok: false,
+      error: `Could not parse CSV: ${e && e.message ? e.message : 'unknown parse error'}`,
+      warnings,
+    };
+  }
+  const rows = parsed && parsed.rows;
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return {
+      ok: false,
+      error: 'CSV has no data rows. Header only or malformed.',
+      warnings,
+    };
+  }
+
+  // --- Column check ---
+  const cols = detectAccelColumns(rows[0]);
+  if (!cols) {
+    return {
+      ok: false,
+      error:
+        'CSV is missing accelerometer columns. ' +
+        'Expected x/y/z (Sensor Logger), userAcceleration.x/y/z, or similar. ' +
+        'Found: ' + Object.keys(rows[0]).join(', '),
+      warnings,
+    };
+  }
+
+  // Row floor
+  if (rows.length < VALIDATION.MIN_ROWS) {
+    return {
+      ok: false,
+      error: `Recording has only ${rows.length} rows. Need at least ${VALIDATION.MIN_ROWS}.`,
+      warnings,
+    };
+  }
+
+  // Numeric sanity
+  const firstX = Number(rows[0][cols.x]);
+  const firstY = Number(rows[0][cols.y]);
+  const firstZ = Number(rows[0][cols.z]);
+  if (!Number.isFinite(firstX) || !Number.isFinite(firstY) || !Number.isFinite(firstZ)) {
+    return {
+      ok: false,
+      error: 'Accelerometer columns contain non-numeric values.',
+      warnings,
+    };
+  }
+
+  // --- Duration + sampling consistency ---
+  const hasTime = 'seconds_elapsed' in rows[0];
+  let durationSeconds;
+  let sampleRate;
+  let intervalCV = null;
+
+  if (hasTime) {
+    const times = rows.map(r => Number(r.seconds_elapsed)).filter(Number.isFinite);
+    if (times.length < 2) {
+      return {
+        ok: false,
+        error: 'seconds_elapsed column is present but contains no valid values.',
+        warnings,
+      };
+    }
+
+    durationSeconds = times[times.length - 1] - times[0];
+    if (!(durationSeconds > 0)) {
+      return {
+        ok: false,
+        error: 'seconds_elapsed is not strictly increasing — file may be corrupted.',
+        warnings,
+      };
+    }
+
+    sampleRate = Math.round((times.length - 1) / durationSeconds);
+
+    const intervals = [];
+    for (let i = 1; i < times.length; i++) {
+      intervals.push(times[i] - times[i - 1]);
+    }
+    const meanInt = intervals.reduce((s, v) => s + v, 0) / intervals.length;
+    const varInt  = intervals.reduce((s, v) => s + (v - meanInt) ** 2, 0) / intervals.length;
+    const stdInt  = Math.sqrt(varInt);
+    intervalCV    = meanInt > 0 ? stdInt / meanInt : 1;
+
+    if (intervalCV > VALIDATION.MAX_INTERVAL_CV) {
+      warnings.push(
+        `Sampling is uneven (variation ${(intervalCV * 100).toFixed(1)}% of mean interval). ` +
+        `Results may be unreliable.`
+      );
+    }
+  } else {
+    sampleRate = 100;
+    durationSeconds = rows.length / sampleRate;
+    warnings.push(
+      'CSV has no seconds_elapsed column. Duration and sample rate are estimates.'
+    );
+  }
+
+  // Sample-rate sanity
+  if (sampleRate < VALIDATION.MIN_SAMPLE_RATE || sampleRate > VALIDATION.MAX_SAMPLE_RATE) {
+    return {
+      ok: false,
+      error:
+        `Sample rate (${sampleRate} Hz) is outside acceptable range ` +
+        `(${VALIDATION.MIN_SAMPLE_RATE}–${VALIDATION.MAX_SAMPLE_RATE} Hz).`,
+      warnings,
+    };
+  }
+
+  // Duration hard limits
+  if (durationSeconds < VALIDATION.MIN_DURATION_SECONDS) {
+    return {
+      ok: false,
+      error:
+        `Recording is only ${durationSeconds.toFixed(1)}s. ` +
+        `Need at least ${VALIDATION.MIN_DURATION_SECONDS}s — target is 30s.`,
+      warnings,
+    };
+  }
+  if (durationSeconds > VALIDATION.MAX_DURATION_SECONDS) {
+    return {
+      ok: false,
+      error:
+        `Recording is ${durationSeconds.toFixed(1)}s — longer than the ` +
+        `${VALIDATION.MAX_DURATION_SECONDS}s maximum.`,
+      warnings,
+    };
+  }
+
+  // Duration soft warning
+  if (
+    durationSeconds < VALIDATION.TARGET_DURATION_MIN ||
+    durationSeconds > VALIDATION.TARGET_DURATION_MAX
+  ) {
+    warnings.push(
+      `Recording is ${durationSeconds.toFixed(1)}s. ` +
+      `Balance Check Protocol targets ~30s for best results.`
+    );
+  }
+
+  return {
+    ok: true,
+    warnings,
+    meta: {
+      rowCount:        rows.length,
+      durationSeconds: durationSeconds,
+      sampleRate:      sampleRate,
+      intervalCV:      intervalCV,
+      columns:         cols,
+    },
+  };
+}
+
 function handleFile(file) {
+  // File-level sanity checks before even reading
+  if (!file) {
+    showToast('No file selected.', 'error');
+    return;
+  }
+  if (file.size === 0) {
+    showToast('File is empty (0 bytes).', 'error');
+    return;
+  }
+  if (file.size > 50 * 1024 * 1024) {
+    showToast('File is too large (>50 MB). Please record a shorter session.', 'error');
+    return;
+  }
+  if (!/\.csv$/i.test(file.name)) {
+    showToast('File should have a .csv extension.', 'error');
+    return;
+  }
+
   const reader = new FileReader();
+
+  reader.onerror = () => {
+    showToast('Could not read file. Try again or pick a different file.', 'error');
+  };
+
   reader.onload = () => {
-    const { rows } = parseCSV(reader.result);
-    if (rows.length < 10) {
-      showToast('CSV has too few rows. Need at least 10 data rows.', 'error');
+    let rawText;
+    try {
+      rawText = reader.result;
+    } catch (e) {
+      showToast('Could not decode file contents.', 'error');
       return;
     }
 
-    const extracted = extractFeatures(rows);
-    if (!extracted) {
-      showToast('Could not find acceleration columns. Expected: x/y/z, userAcceleration.x/y/z, or accelerometerAccelerationX/Y/Z', 'error');
+    // --- Run validation ---
+    const check = validateRombergCSV(rawText);
+    if (!check.ok) {
+      showToast(check.error, 'error');
       return;
     }
+    // Non-blocking warnings (one toast each)
+    for (const w of check.warnings) {
+      showToast(w, 'info');
+    }
+
+    // --- Parse + extract + predict (guard each step) ---
+    let rows;
+    try {
+      ({ rows } = parseCSV(rawText));
+    } catch (e) {
+      showToast('Unexpected parse error after validation.', 'error');
+      return;
+    }
+
+    let extracted;
+    try {
+      extracted = extractFeatures(rows);
+    } catch (e) {
+      showToast('Feature extraction failed: ' + (e.message || 'unknown error'), 'error');
+      return;
+    }
+    if (!extracted) {
+      showToast('Could not extract features from this file.', 'error');
+      return;
+    }
+
     const { features, accelData, sampleRate: detectedRate } = extracted;
 
-    const result = predict(features);
+    let result;
+    try {
+      result = predict(features);
+    } catch (e) {
+      showToast('Prediction failed: ' + (e.message || 'unknown error'), 'error');
+      return;
+    }
+
     showPrediction(result, features, file.name, rows.length, accelData, detectedRate);
-    saveToSupabase(features, result, file.name, reader.result);
+
+    // Save with full metadata
+    const durationSeconds = rows.length / detectedRate;
+    saveToSupabase(features, result, file.name, rawText, {
+      modelVersion:    'romberg_v2',
+      durationSeconds: durationSeconds,
+      sampleRate:      detectedRate,
+      nSamples:        rows.length,
+    });
   };
-  reader.readAsText(file);
+
+  try {
+    reader.readAsText(file);
+  } catch (e) {
+    showToast('Could not start reading file: ' + (e.message || 'unknown error'), 'error');
+  }
 }
 
 function showPrediction(result, features, filename, sampleCount, accelData, detectedRate) {
@@ -1146,32 +1467,86 @@ function showPrediction(result, features, filename, sampleCount, accelData, dete
   }
 }
 
-// SAVE TO SUPABASE FUNCTION
+// Persistent per-browser session ID. Enables grouped cross-validation
+// so the model isn't "cheating" by seeing near-duplicate trials from
+// the same recording conditions in both train and test (spec §V).
+const SESSION_STORAGE_KEY = 'romberger_session_id';
+
+function getSessionId() {
+  let id = localStorage.getItem(SESSION_STORAGE_KEY);
+  if (!id) {
+    id = crypto.randomUUID();
+    localStorage.setItem(SESSION_STORAGE_KEY, id);
+  }
+  return id;
+}
+
+// Read the label radio. Returns 'open', 'closed', or null (unknown).
+function getRombergLabel() {
+  const checked = document.querySelector('input[name="rombergLabel"]:checked');
+  if (!checked || !checked.value) return null;
+  return checked.value;
+}
+
+function resetSessionId() {
+  localStorage.removeItem(SESSION_STORAGE_KEY);
+  return getSessionId();
+}
+
+// SUPABASE INTEGRATION
 
 const SUPABASE_URL = 'https://xmxyschvrqcqhqznjdgu.supabase.co'
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhteHlzY2h2cnFjcWhxem5qZGd1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ0NzEzNTgsImV4cCI6MjA5MDA0NzM1OH0.0odYckxFFkZhBaSxA6HB_p7VU1iUCGOeKmlbaR1EDZ4'
 const SUPABASE_TABLE = 'samples'
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY)
+  
+// Flip to true once the Edge Function is deployed.
+const USE_EDGE_FUNCTION = false;
 
-async function saveToSupabase(features, result, filename, rawCsvText) {
-  const sampleId = crypto.randomUUID();
+async function saveToSupabase(features, result, filename, rawCsvText, meta = {}) {
+  const sampleId  = crypto.randomUUID();
+  const sessionId = getSessionId();
+  const userLabel = getRombergLabel();
 
+  const storagePath = `${sampleId}/${filename}`;
+
+  // 1. Upload the raw CSV to storage
   const { error: uploadError } = await sb.storage
     .from('csv-uploads')
-    .upload(`${sampleId}/${filename}`, new Blob([rawCsvText], { type: 'text/csv' }));
-  if (uploadError) console.error('Storage upload failed:', uploadError.message);
+    .upload(storagePath, new Blob([rawCsvText], { type: 'text/csv' }));
+  if (uploadError) {
+    console.error('Storage upload failed:', uploadError.message);
+    // Don't return — still save the row so we don't lose the features
+  }
 
-  const { error: dbError } = await sb.from(SUPABASE_TABLE).insert([{
+  // 2. Build the row
+  const row = {
     sample_id:          sampleId,
     timestamp:          new Date().toISOString(),
-    subject_session_id: crypto.randomUUID(),
-    label:              null,
+    subject_session_id: sessionId,
+    label:              userLabel,
     extracted_features: features,
     prediction_output:  result.label,
-    storage_path:       `${sampleId}/${filename}`,
-  }]);
-  if (dbError) console.error('Supabase save failed:', dbError.message);
-  else console.log('Saved to Supabase:', sampleId);
+    confidence:         result.confidence ?? null,
+    model_version:      meta.modelVersion    ?? 'romberg_v2',
+    duration_seconds:   meta.durationSeconds ?? null,
+    sample_rate:        meta.sampleRate      ?? null,
+    n_samples:          meta.nSamples        ?? null,
+    storage_path:       storagePath,
+  };
+
+  // 3. Insert — either via Edge Function or directly
+  if (USE_EDGE_FUNCTION) {
+    const { data, error } = await sb.functions.invoke('validate-upload', {
+      body: { row, csvSampleCount: rawCsvText.split('\n').length - 1 },
+    });
+    if (error) console.error('Edge function failed:', error.message);
+    else       console.log('Saved via edge function:', sampleId, data);
+  } else {
+    const { error: dbError } = await sb.from(SUPABASE_TABLE).insert([row]);
+    if (dbError) console.error('Supabase save failed:', dbError.message);
+    else         console.log('Saved to Supabase:', sampleId);
+  }
 }
 
 /* (Notebook viewer removed — training pipeline uses Python scripts, not notebooks) */
