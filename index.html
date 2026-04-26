@@ -233,6 +233,19 @@
     .pred-feat-label { color: var(--text-muted); }
     .pred-feat-val { font-weight: 600; font-variant-numeric: tabular-nums; }
 
+    /* Prediction history */
+    .history-table { width: 100%; border-collapse: collapse; font-size: .85rem; margin-top: 1.5rem; }
+    .history-table th { background: var(--bg); font-weight: 600; text-align: left; padding: .6rem 1rem; border-bottom: 1px solid var(--border); font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; color: var(--text-muted); }
+    .history-table td { padding: .55rem 1rem; border-bottom: 1px solid var(--border); font-variant-numeric: tabular-nums; font-size: .84rem; }
+    .history-table tbody tr:hover { background: var(--accent-light, rgba(0,0,0,.02)); }
+    .history-empty { text-align: center; padding: 2rem; color: var(--text-muted); font-size: .9rem; }
+    .history-badge { display: inline-block; padding: .2rem .7rem; border-radius: 99px; font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+    .history-badge-open { background: var(--open-bg); color: var(--open-color); }
+    .history-badge-closed { background: var(--closed-bg); color: var(--closed-color); }
+    .history-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: .5rem; }
+    .history-refresh-btn { background: none; border: 1px solid var(--border); border-radius: 8px; padding: .4rem .8rem; font-size: .8rem; color: var(--text-muted); cursor: pointer; font-family: 'DM Sans', sans-serif; transition: border-color .2s, color .2s; }
+    .history-refresh-btn:hover { border-color: var(--accent); color: var(--accent); }
+
     /* Stick figure animation */
     .stick-animation-card {
       margin-top: 2rem; padding: 1.5rem; background: var(--bg);
@@ -465,6 +478,7 @@
       <a href="#performance-section">Performance</a>
       <a href="#pipeline-section">Pipeline</a>
       <a href="#predict-section">Predict</a>
+      <a href="#history-section">History</a>
       <a href="learn.html">Learn</a>
     </div>
     <button class="theme-toggle" id="themeToggle" aria-label="Toggle dark mode" title="Toggle dark mode">
@@ -719,6 +733,21 @@
   <div class="prediction-result" id="predictionResult"></div>
 </section>
 
+<!-- 6. Prediction History -->
+<section id="history-section">
+  <div class="history-header">
+    <div>
+      <p class="section-label reveal">History</p>
+      <h2 class="section-title reveal">Prediction history</h2>
+    </div>
+    <button class="history-refresh-btn" id="historyRefreshBtn" title="Refresh history">&#8635; Refresh</button>
+  </div>
+  <p class="section-desc reveal">Recent predictions saved from this app.</p>
+  <div id="historyContent">
+    <div class="history-empty">Loading prediction history...</div>
+  </div>
+</section>
+
 <footer><p>Romberger &#8212; an educational balance assessment tool using the Romberg test. Not intended for clinical use.</p></footer>
 
 <!-- Toast container -->
@@ -862,6 +891,18 @@ function extractFeatures(rows) {
     } else {
       return null;
     }
+  }
+
+  // Filter out NaN/Infinity values
+  const validIdx = [];
+  for (let i = 0; i < ax.length; i++) {
+    if (isFinite(ax[i]) && isFinite(ay[i]) && isFinite(az[i])) validIdx.push(i);
+  }
+  if (validIdx.length < ax.length) {
+    ax = validIdx.map(i => ax[i]);
+    ay = validIdx.map(i => ay[i]);
+    az = validIdx.map(i => az[i]);
+    rows = validIdx.map(i => rows[i]);
   }
 
   const n = ax.length;
@@ -1388,6 +1429,8 @@ function handleFile(file) {
       durationSeconds: durationSeconds,
       sampleRate:      detectedRate,
       nSamples:        rows.length,
+    }).then(() => {
+      if (typeof loadPredictionHistory === 'function') loadPredictionHistory();
     });
   };
 
@@ -1504,50 +1547,125 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY)
 const USE_EDGE_FUNCTION = false;
 
 async function saveToSupabase(features, result, filename, rawCsvText, meta = {}) {
-  const sampleId  = crypto.randomUUID();
-  const sessionId = getSessionId();
-  const userLabel = getRombergLabel();
+  try {
+    const sampleId  = crypto.randomUUID();
+    const sessionId = getSessionId();
+    const userLabel = getRombergLabel();
 
-  const storagePath = `${sampleId}/${filename}`;
+    const storagePath = `${sampleId}/${filename}`;
 
-  // 1. Upload the raw CSV to storage
-  const { error: uploadError } = await sb.storage
-    .from('csv-uploads')
-    .upload(storagePath, new Blob([rawCsvText], { type: 'text/csv' }));
-  if (uploadError) {
-    console.error('Storage upload failed:', uploadError.message);
-    // Don't return — still save the row so we don't lose the features
-  }
+    // 1. Upload the raw CSV to storage
+    const { error: uploadError } = await sb.storage
+      .from('csv-uploads')
+      .upload(storagePath, new Blob([rawCsvText], { type: 'text/csv' }));
+    if (uploadError) {
+      console.error('Storage upload failed:', uploadError.message);
+      showToast('CSV upload to storage failed: ' + uploadError.message, 'error');
+    }
 
-  // 2. Build the row
-  const row = {
-    sample_id:          sampleId,
-    timestamp:          new Date().toISOString(),
-    subject_session_id: sessionId,
-    label:              userLabel,
-    extracted_features: features,
-    prediction_output:  result.label,
-    confidence:         result.confidence ?? null,
-    model_version:      meta.modelVersion    ?? 'romberg_v2',
-    duration_seconds:   meta.durationSeconds ?? null,
-    sample_rate:        meta.sampleRate      ?? null,
-    n_samples:          meta.nSamples        ?? null,
-    storage_path:       storagePath,
-  };
+    // 2. Build the row
+    const row = {
+      sample_id:          sampleId,
+      timestamp:          new Date().toISOString(),
+      subject_session_id: sessionId,
+      label:              userLabel,
+      extracted_features: features,
+      prediction_output:  result.label,
+      confidence:         result.confidence ?? null,
+      model_version:      meta.modelVersion    ?? 'romberg_v2',
+      duration_seconds:   meta.durationSeconds ?? null,
+      sample_rate:        meta.sampleRate      ?? null,
+      n_samples:          meta.nSamples        ?? null,
+      storage_path:       storagePath,
+    };
 
-  // 3. Insert — either via Edge Function or directly
-  if (USE_EDGE_FUNCTION) {
-    const { data, error } = await sb.functions.invoke('validate-upload', {
-      body: { row, csvSampleCount: rawCsvText.split('\n').length - 1 },
-    });
-    if (error) console.error('Edge function failed:', error.message);
-    else       console.log('Saved via edge function:', sampleId, data);
-  } else {
-    const { error: dbError } = await sb.from(SUPABASE_TABLE).insert([row]);
-    if (dbError) console.error('Supabase save failed:', dbError.message);
-    else         console.log('Saved to Supabase:', sampleId);
+    // 3. Insert — either via Edge Function or directly
+    if (USE_EDGE_FUNCTION) {
+      const { data, error } = await sb.functions.invoke('validate-upload', {
+        body: { row, csvSampleCount: rawCsvText.split('\n').length - 1 },
+      });
+      if (error) {
+        console.error('Edge function failed:', error.message);
+        showToast('Failed to save prediction record.', 'error');
+        return null;
+      }
+      console.log('Saved via edge function:', sampleId, data);
+    } else {
+      const { error: dbError } = await sb.from(SUPABASE_TABLE).insert([row]);
+      if (dbError) {
+        console.error('Supabase save failed:', dbError.message);
+        showToast('Failed to save prediction record.', 'error');
+        return null;
+      }
+      console.log('Saved to Supabase:', sampleId);
+    }
+
+    showToast('Prediction saved.', 'success', 3000);
+    return sampleId;
+  } catch (err) {
+    console.error('Supabase error:', err);
+    showToast('Could not connect to server. Prediction was not saved.', 'error');
+    return null;
   }
 }
+
+/* ==========================================================
+   PREDICTION HISTORY (loads from Supabase)
+========================================================== */
+async function loadPredictionHistory() {
+  const container = document.getElementById('historyContent');
+  if (!container) return;
+
+  try {
+    const { data, error } = await sb
+      .from(SUPABASE_TABLE)
+      .select('sample_id, timestamp, prediction_output, storage_path')
+      .order('timestamp', { ascending: false })
+      .limit(20);
+
+    if (error) {
+      console.error('History fetch failed:', error.message);
+      container.innerHTML = '<div class="history-empty">Could not load prediction history.</div>';
+      return;
+    }
+
+    if (!data || data.length === 0) {
+      container.innerHTML = '<div class="history-empty">No predictions yet. Upload a CSV to get started.</div>';
+      return;
+    }
+
+    let html = '<table class="history-table"><thead><tr><th>Time</th><th>File</th><th>Prediction</th></tr></thead><tbody>';
+
+    data.forEach(row => {
+      const date = new Date(row.timestamp);
+      const timeStr = date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+        + ' ' + date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+
+      const filename = row.storage_path ? row.storage_path.split('/').pop() : 'Unknown';
+      const isOpen = row.prediction_output === 'open';
+      const badgeClass = isOpen ? 'history-badge-open' : 'history-badge-closed';
+      const labelText = isOpen ? 'Eyes Open' : 'Eyes Closed';
+
+      html += '<tr>'
+        + '<td>' + timeStr + '</td>'
+        + '<td title="' + filename + '" style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + filename + '</td>'
+        + '<td><span class="history-badge ' + badgeClass + '">' + labelText + '</span></td>'
+        + '</tr>';
+    });
+
+    html += '</tbody></table>';
+    container.innerHTML = html;
+  } catch (err) {
+    console.error('History error:', err);
+    container.innerHTML = '<div class="history-empty">Could not load prediction history.</div>';
+  }
+}
+
+loadPredictionHistory();
+document.getElementById('historyRefreshBtn').addEventListener('click', () => {
+  document.getElementById('historyContent').innerHTML = '<div class="history-empty">Loading...</div>';
+  loadPredictionHistory();
+});
 
 /* (Notebook viewer removed — training pipeline uses Python scripts, not notebooks) */
 
