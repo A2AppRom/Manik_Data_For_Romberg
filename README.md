@@ -1,73 +1,70 @@
 # Romberger
 
-A browser-based posture classification and Romberg balance test tool using smartphone accelerometer data.
+A browser-based Romberg balance test web app that classifies eyes-open vs eyes-closed stance using smartphone accelerometer data.
 
 ---
 
 ## What is it?
 
-Romberger is a single-page web app (`index.html`) that runs two ML classifiers entirely in the browser:
+Romberger is a web app inspired by the clinical Romberg test. Users upload a 30-second accelerometer CSV recorded with a phone held against their chest, and the app classifies whether they were standing with eyes open (normal balance) or eyes closed (simulated impaired balance).
 
-1. **Standing vs Sitting** — classifies posture from accelerometer CSV data (91.5% LOSO accuracy, 24 subjects)
-2. **Eyes Open vs Closed (Romberg Test)** — detects whether a person had their eyes open or closed while standing still (62.5% LOSO accuracy, 2 subjects — needs more data)
+The ML model (SVM Linear) runs entirely in the browser using JSON-exported weights. After prediction, a stick figure animation replays the recorded movement. All predictions are stored in a Supabase database so the dataset grows over time.
 
-Both models are logistic regression trained in Python and exported as JSON weights embedded in the frontend. After prediction, a stick figure animation replays the recorded movement.
-
-This is not a diagnostic tool — it's built for education and exploration.
+This is not a diagnostic tool — it is built for education and exploration.
 
 ---
 
 ## Data
 
-### Standing vs Sitting — MotionSense Dataset (Kaggle)
+### Self-Collected Balance Data
 
-Source: [MotionSense Dataset](https://www.kaggle.com/datasets/malekzadeh/motionsense-dataset) by Malekzadeh et al.
+Collected using the [Sensor Logger](https://apps.apple.com/app/sensor-logger/id1531582925) app on iPhone following the Balance Check Protocol (phone on chest, crossed-arm hold, 30-second trials).
 
-Location: `Manik_Data_For_Romberg/new_data/A_DeviceMotion_data/A_DeviceMotion_data/`
+Location: `romberg_data/`
 
-- 24 subjects, 17 activity folders (standing: `std_6/`, `std_14/`; sitting: `sit_5/`, `sit_13/`)
-- Each folder contains `sub_1.csv` through `sub_24.csv`
-- Columns: `attitude.roll/pitch/yaw`, `gravity.x/y/z`, `rotationRate.x/y/z`, `userAcceleration.x/y/z`
-- Sample rate: ~50 Hz
+- 9 subjects, 142 samples (74 eyes-closed, 68 eyes-open)
+- Columns: `time`, `seconds_elapsed`, `z`, `y`, `x` (raw accelerometer)
+- Long recordings chunked into 30-second segments
+- Subject 08 (Sophia) removed due to corrupted data (identical open/closed files)
 
-Training notebook: `train_model.ipynb` → exports `model_weights.json`
+---
 
-### Eyes Open vs Closed — Self-Collected Balance Data
+## ML Pipeline
 
-Collected using the [Sensor Logger](https://apps.apple.com/app/sensor-logger/id1531582925) app on iPhone.
+1. **Consolidate** — merge recordings from team repos into `romberg_data/`
+2. **Clean** — remove sensor artifacts (startup spikes, pauses) → `romberg_data_cleaned/`
+3. **Chunk** — split long recordings into 30-second segments → `romberg_data_final/`
+4. **Extract features** — 6 summary statistics per sample → `features_dataset.csv`
+   - mean, median, std, skewness, kurtosis, path_length (all computed from sway magnitude)
+5. **Train** — SVM Linear with GroupKFold leave-one-subject-out cross-validation (9 folds)
+6. **Export** — model weights to `romberg_model_weights.json` for client-side inference
 
-Location: `balance_data/`
+### Results (LOSO CV)
 
-```
-balance_data/
-  eyes_open/
-    Accelerometer_Sophia_Open.csv
-    Accelerometer_Syed_Open.csv
-  eyes_closed/
-    Accelerometer_Sophia_Closed.csv
-    Accelerometer_Syed_Closed.csv
-```
-
-- 2 subjects (Sophia, Syed), ~5 minutes each condition
-- Columns: `time`, `seconds_elapsed`, `z`, `y`, `x` (raw accelerometer including gravity)
-- Sample rate: ~100 Hz
-
-Training notebook: `train_romberg.ipynb` → exports `romberg_model_weights.json`
+| Metric    | Value |
+|-----------|-------|
+| Accuracy  | 73.9% |
+| Precision | 70.7% |
+| Recall    | 77.9% |
+| F1 Score  | 74.1% |
+| AUC       | 77.1% |
 
 ---
 
 ## Tech Stack
 
-- **Python / Jupyter** — feature extraction (8 features: rms_sway, std_x/y/z, mean_jerk, path_length, sway_mean, sway_peak), LOSO cross-validation, logistic regression training
-- **HTML / CSS / JS** — single-file frontend (`index.html`), client-side prediction, canvas stick figure animation
+- **Python** — pandas, scikit-learn, scipy for pipeline and training
+- **HTML / CSS / JS** — single-file frontend (`index.html`), client-side prediction, canvas animation
+- **Supabase** — PostgreSQL database + file storage for predictions and uploaded CSVs
 
 ---
 
 ## How to Use
 
-1. Open `index.html` in a browser
-2. Upload a CSV from your phone's accelerometer, or click "Try a demo"
-3. View the prediction and stick figure movement replay
+1. Open the [live site](https://a2approm.github.io/Manik_Data_For_Romberg/) or `index.html` locally
+2. Upload a 30-second accelerometer CSV, or click "Try a demo"
+3. View the prediction, confidence, extracted features, and stick figure replay
+4. Past predictions are stored and visible in the prediction history section
 
 ---
 

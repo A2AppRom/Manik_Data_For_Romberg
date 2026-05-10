@@ -3,3 +3,6 @@ reports/
 __pycache__/
 *.pyc
 .DS_Store
+hw3.html
+hw3.pdf
+presentation/
