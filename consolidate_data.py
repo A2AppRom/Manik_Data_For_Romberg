@@ -12,10 +12,10 @@ Duplicate analysis (verified by matching timestamps):
   - Data_For_ML Syed zips == Manik Syed long → skip zips
 
 Unique data sources:
-  1. sophia-romberg-data subjects 0-8 (canonical copy of all short recordings)
+  1. sophia-romberg-data subjects 0-21 (canonical copy; 0-8 original, 9-21 from Google Drive)
   2. Jack's own trials (Jack_Trial1-6, Jack_Impaired_1-8, Jack_Data subfolder)
   3. Igor new long recordings (Apr 22) — 4 files
-  4. Syed long recordings (Apr 5, from Manik balance_data)
+  4. Syed long recordings (Apr 5, from Manik balance_data, now in old_files)
 """
 
 import os
@@ -72,24 +72,30 @@ def make_session_dir(subject_id, session_id):
 #    subject_3 = Person4, subject_4 = Barbara, subject_5 = Igor,
 #    subject_6 = Syed, subject_7 = Sadaf, subject_8 = Sophia (chunked)
 # ============================================================
-print("=== sophia-romberg-data (subjects 0-8) ===")
+print("=== sophia-romberg-data (subjects 0-21) ===")
 SOPHIA = os.path.join(BASE, "sophia-romberg-data", "data")
 
 SOPHIA_NAMES = {
     0: "Person1", 1: "Person2", 2: "Person3", 3: "Person4",
     4: "Barbara", 5: "Igor", 6: "Syed", 7: "Sadaf", 8: "Sophia",
+    9: "Subject9", 10: "Subject10", 11: "Subject11", 12: "Subject12",
+    13: "Subject13", 14: "Subject14", 15: "Subject15", 16: "Subject16",
+    17: "Subject17", 18: "Subject18", 19: "Subject19", 20: "Subject20",
+    21: "Subject21",
 }
 
-for subj_dir in sorted(os.listdir(SOPHIA)):
+for subj_dir in sorted(os.listdir(SOPHIA), key=lambda x: int(x.split("_")[1]) if x.startswith("subject_") else 0):
     if not subj_dir.startswith("subject_"):
         continue
     sophia_idx = int(subj_dir.split("_")[1])
+    if sophia_idx == 8:
+        print(f"  Skipping subject_8 (Sophia) — chunked from single recording, not independent sessions")
+        continue
     name = SOPHIA_NAMES.get(sophia_idx, f"sophia_{sophia_idx}")
     subj_path = os.path.join(SOPHIA, subj_dir)
 
-    for sess_dir in sorted(os.listdir(subj_path)):
-        if not sess_dir.startswith("session_"):
-            continue
+    sessions = [d for d in os.listdir(subj_path) if d.startswith("session_")]
+    for sess_dir in sorted(sessions, key=lambda x: int(x.split("_")[1])):
         sess_idx = int(sess_dir.split("_")[1])
         sess_path = os.path.join(subj_path, sess_dir)
         dst = make_session_dir(subject_counter, sess_idx)
@@ -219,13 +225,13 @@ existing_syed_sessions = [r for r in manifest_rows if r["subject_id"] == "subjec
 next_sess = max(r["session_id"] for r in existing_syed_sessions) + 1 if existing_syed_sessions else 0
 
 dst = make_session_dir(syed_subject, next_sess)
-src = os.path.join(BASE, "Manik_Data_For_Romberg", "balance_data", "eyes_open",
+src = os.path.join(BASE, "Manik_Data_For_Romberg", "old_files", "balance_data", "eyes_open",
                    "Accelerometer_Syed_Open.csv")
 rows = copy_csv(src, os.path.join(dst, "eyes_open.csv"))
 add_to_manifest(syed_subject, "Syed", next_sess, "open", "Manik_balance_data", src, rows)
 print(f"  subject_{syed_subject:02d}/session_{next_sess} eyes_open (long ~5min): {rows} rows")
 
-src = os.path.join(BASE, "Manik_Data_For_Romberg", "balance_data", "eyes_closed",
+src = os.path.join(BASE, "Manik_Data_For_Romberg", "old_files", "balance_data", "eyes_closed",
                    "Accelerometer_Syed_Closed.csv")
 rows = copy_csv(src, os.path.join(dst, "eyes_closed.csv"))
 add_to_manifest(syed_subject, "Syed", next_sess, "closed", "Manik_balance_data", src, rows)

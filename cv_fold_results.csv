@@ -1,28 +1,177 @@
 model,fold,held_out_subject,n_test,accuracy,precision,recall,f1
-SVM (RBF kernel),1,subject_09,61,0.623,0.5417,0.963,0.6933
-SVM (RBF kernel),2,subject_05,45,0.6667,0.75,0.5217,0.6154
-SVM (RBF kernel),3,subject_06,24,0.5,0.0,0.0,0.0
-SVM (RBF kernel),4,subject_07,2,0.0,0.0,0.0,0.0
-SVM (RBF kernel),5,subject_04,2,0.5,0.0,0.0,0.0
-SVM (RBF kernel),6,subject_03,2,0.5,0.5,1.0,0.6667
-SVM (RBF kernel),7,subject_02,2,0.5,0.5,1.0,0.6667
-SVM (RBF kernel),8,subject_01,2,1.0,1.0,1.0,1.0
-SVM (RBF kernel),9,subject_00,2,0.0,0.0,0.0,0.0
-SVM (Linear),1,subject_09,61,0.8197,0.7222,0.963,0.8254
-SVM (Linear),2,subject_05,45,0.7778,0.7097,0.9565,0.8148
-SVM (Linear),3,subject_06,24,0.5,0.0,0.0,0.0
-SVM (Linear),4,subject_07,2,0.5,0.5,1.0,0.6667
-SVM (Linear),5,subject_04,2,1.0,1.0,1.0,1.0
-SVM (Linear),6,subject_03,2,0.5,0.5,1.0,0.6667
-SVM (Linear),7,subject_02,2,0.5,0.5,1.0,0.6667
-SVM (Linear),8,subject_01,2,1.0,1.0,1.0,1.0
-SVM (Linear),9,subject_00,2,0.5,0.0,0.0,0.0
-Logistic Regression,1,subject_09,61,0.8361,0.7429,0.963,0.8387
-Logistic Regression,2,subject_05,45,0.8222,0.7419,1.0,0.8519
-Logistic Regression,3,subject_06,24,0.5,0.0,0.0,0.0
-Logistic Regression,4,subject_07,2,0.5,0.5,1.0,0.6667
-Logistic Regression,5,subject_04,2,1.0,1.0,1.0,1.0
-Logistic Regression,6,subject_03,2,0.5,0.5,1.0,0.6667
-Logistic Regression,7,subject_02,2,0.5,0.5,1.0,0.6667
-Logistic Regression,8,subject_01,2,1.0,1.0,1.0,1.0
-Logistic Regression,9,subject_00,2,0.0,0.0,0.0,0.0
+SVM (RBF kernel),1,subject_21,34,0.7941,0.75,0.8824,0.8108
+SVM (RBF kernel),2,subject_20,16,0.875,0.875,0.875,0.875
+SVM (RBF kernel),3,subject_05,16,0.6875,0.6364,0.875,0.7368
+SVM (RBF kernel),4,subject_06,10,0.5,0.0,0.0,0.0
+SVM (RBF kernel),5,subject_01,2,0.5,0.5,1.0,0.6667
+SVM (RBF kernel),6,subject_02,2,0.5,0.5,1.0,0.6667
+SVM (RBF kernel),7,subject_03,2,0.5,0.5,1.0,0.6667
+SVM (RBF kernel),8,subject_04,2,0.5,0.5,1.0,0.6667
+SVM (RBF kernel),9,subject_07,2,0.5,0.5,1.0,0.6667
+SVM (RBF kernel),10,subject_08,2,0.5,0.5,1.0,0.6667
+SVM (RBF kernel),11,subject_09,2,0.5,0.5,1.0,0.6667
+SVM (RBF kernel),12,subject_10,2,0.5,0.5,1.0,0.6667
+SVM (RBF kernel),13,subject_12,2,0.5,0.5,1.0,0.6667
+SVM (RBF kernel),14,subject_13,2,0.5,0.5,1.0,0.6667
+SVM (RBF kernel),15,subject_14,2,0.5,0.5,1.0,0.6667
+SVM (RBF kernel),16,subject_15,2,0.5,0.5,1.0,0.6667
+SVM (RBF kernel),17,subject_16,2,0.5,0.0,0.0,0.0
+SVM (RBF kernel),18,subject_17,2,0.5,0.5,1.0,0.6667
+SVM (RBF kernel),19,subject_18,2,0.5,0.5,1.0,0.6667
+SVM (RBF kernel),20,subject_19,2,0.5,0.0,0.0,0.0
+SVM (RBF kernel),21,subject_00,2,0.0,0.0,0.0,0.0
+SVM (RBF kernel),22,subject_11,1,1.0,1.0,1.0,1.0
+SVM (Linear),1,subject_21,34,0.7059,0.7059,0.7059,0.7059
+SVM (Linear),2,subject_20,16,0.875,0.875,0.875,0.875
+SVM (Linear),3,subject_05,16,0.6875,0.6154,1.0,0.7619
+SVM (Linear),4,subject_06,10,0.5,0.0,0.0,0.0
+SVM (Linear),5,subject_01,2,0.5,0.5,1.0,0.6667
+SVM (Linear),6,subject_02,2,0.5,0.5,1.0,0.6667
+SVM (Linear),7,subject_03,2,0.5,0.5,1.0,0.6667
+SVM (Linear),8,subject_04,2,0.5,0.5,1.0,0.6667
+SVM (Linear),9,subject_07,2,0.0,0.0,0.0,0.0
+SVM (Linear),10,subject_08,2,0.5,0.5,1.0,0.6667
+SVM (Linear),11,subject_09,2,0.5,0.5,1.0,0.6667
+SVM (Linear),12,subject_10,2,0.5,0.5,1.0,0.6667
+SVM (Linear),13,subject_12,2,0.0,0.0,0.0,0.0
+SVM (Linear),14,subject_13,2,0.0,0.0,0.0,0.0
+SVM (Linear),15,subject_14,2,0.5,0.5,1.0,0.6667
+SVM (Linear),16,subject_15,2,0.0,0.0,0.0,0.0
+SVM (Linear),17,subject_16,2,0.5,0.0,0.0,0.0
+SVM (Linear),18,subject_17,2,0.5,0.5,1.0,0.6667
+SVM (Linear),19,subject_18,2,0.5,0.5,1.0,0.6667
+SVM (Linear),20,subject_19,2,0.5,0.0,0.0,0.0
+SVM (Linear),21,subject_00,2,0.5,0.5,1.0,0.6667
+SVM (Linear),22,subject_11,1,0.0,0.0,0.0,0.0
+Logistic Regression,1,subject_21,34,0.7059,0.7059,0.7059,0.7059
+Logistic Regression,2,subject_20,16,0.9375,1.0,0.875,0.9333
+Logistic Regression,3,subject_05,16,0.75,0.6667,1.0,0.8
+Logistic Regression,4,subject_06,10,0.5,0.0,0.0,0.0
+Logistic Regression,5,subject_01,2,0.5,0.5,1.0,0.6667
+Logistic Regression,6,subject_02,2,0.5,0.5,1.0,0.6667
+Logistic Regression,7,subject_03,2,0.5,0.5,1.0,0.6667
+Logistic Regression,8,subject_04,2,0.5,0.5,1.0,0.6667
+Logistic Regression,9,subject_07,2,0.5,0.5,1.0,0.6667
+Logistic Regression,10,subject_08,2,0.5,0.5,1.0,0.6667
+Logistic Regression,11,subject_09,2,0.5,0.5,1.0,0.6667
+Logistic Regression,12,subject_10,2,0.5,0.5,1.0,0.6667
+Logistic Regression,13,subject_12,2,0.5,0.0,0.0,0.0
+Logistic Regression,14,subject_13,2,0.5,0.5,1.0,0.6667
+Logistic Regression,15,subject_14,2,0.5,0.5,1.0,0.6667
+Logistic Regression,16,subject_15,2,0.0,0.0,0.0,0.0
+Logistic Regression,17,subject_16,2,0.5,0.0,0.0,0.0
+Logistic Regression,18,subject_17,2,0.5,0.5,1.0,0.6667
+Logistic Regression,19,subject_18,2,0.5,0.5,1.0,0.6667
+Logistic Regression,20,subject_19,2,0.5,0.0,0.0,0.0
+Logistic Regression,21,subject_00,2,0.5,0.5,1.0,0.6667
+Logistic Regression,22,subject_11,1,0.0,0.0,0.0,0.0
+KNN (k=3),1,subject_21,34,0.8235,0.7619,0.9412,0.8421
+KNN (k=3),2,subject_20,16,1.0,1.0,1.0,1.0
+KNN (k=3),3,subject_05,16,0.625,0.6667,0.5,0.5714
+KNN (k=3),4,subject_06,10,0.5,0.0,0.0,0.0
+KNN (k=3),5,subject_01,2,0.5,0.5,1.0,0.6667
+KNN (k=3),6,subject_02,2,0.5,0.5,1.0,0.6667
+KNN (k=3),7,subject_03,2,0.5,0.5,1.0,0.6667
+KNN (k=3),8,subject_04,2,1.0,1.0,1.0,1.0
+KNN (k=3),9,subject_07,2,0.0,0.0,0.0,0.0
+KNN (k=3),10,subject_08,2,0.5,0.0,0.0,0.0
+KNN (k=3),11,subject_09,2,0.5,0.0,0.0,0.0
+KNN (k=3),12,subject_10,2,0.0,0.0,0.0,0.0
+KNN (k=3),13,subject_12,2,0.0,0.0,0.0,0.0
+KNN (k=3),14,subject_13,2,0.0,0.0,0.0,0.0
+KNN (k=3),15,subject_14,2,0.0,0.0,0.0,0.0
+KNN (k=3),16,subject_15,2,0.5,0.5,1.0,0.6667
+KNN (k=3),17,subject_16,2,0.5,0.0,0.0,0.0
+KNN (k=3),18,subject_17,2,0.5,0.5,1.0,0.6667
+KNN (k=3),19,subject_18,2,0.5,0.5,1.0,0.6667
+KNN (k=3),20,subject_19,2,0.5,0.0,0.0,0.0
+KNN (k=3),21,subject_00,2,0.5,0.0,0.0,0.0
+KNN (k=3),22,subject_11,1,1.0,1.0,1.0,1.0
+KNN (k=5),1,subject_21,34,0.8529,0.8,0.9412,0.8649
+KNN (k=5),2,subject_20,16,1.0,1.0,1.0,1.0
+KNN (k=5),3,subject_05,16,0.5,0.5,0.5,0.5
+KNN (k=5),4,subject_06,10,0.6,1.0,0.2,0.3333
+KNN (k=5),5,subject_01,2,0.5,0.0,0.0,0.0
+KNN (k=5),6,subject_02,2,0.5,0.5,1.0,0.6667
+KNN (k=5),7,subject_03,2,0.5,0.5,1.0,0.6667
+KNN (k=5),8,subject_04,2,1.0,1.0,1.0,1.0
+KNN (k=5),9,subject_07,2,0.0,0.0,0.0,0.0
+KNN (k=5),10,subject_08,2,0.0,0.0,0.0,0.0
+KNN (k=5),11,subject_09,2,0.0,0.0,0.0,0.0
+KNN (k=5),12,subject_10,2,0.0,0.0,0.0,0.0
+KNN (k=5),13,subject_12,2,0.0,0.0,0.0,0.0
+KNN (k=5),14,subject_13,2,0.5,0.5,1.0,0.6667
+KNN (k=5),15,subject_14,2,0.0,0.0,0.0,0.0
+KNN (k=5),16,subject_15,2,0.5,0.0,0.0,0.0
+KNN (k=5),17,subject_16,2,0.5,0.0,0.0,0.0
+KNN (k=5),18,subject_17,2,0.5,0.5,1.0,0.6667
+KNN (k=5),19,subject_18,2,0.5,0.5,1.0,0.6667
+KNN (k=5),20,subject_19,2,0.5,0.0,0.0,0.0
+KNN (k=5),21,subject_00,2,0.0,0.0,0.0,0.0
+KNN (k=5),22,subject_11,1,0.0,0.0,0.0,0.0
+KNN (k=7),1,subject_21,34,0.8235,0.7619,0.9412,0.8421
+KNN (k=7),2,subject_20,16,1.0,1.0,1.0,1.0
+KNN (k=7),3,subject_05,16,0.75,0.75,0.75,0.75
+KNN (k=7),4,subject_06,10,0.6,1.0,0.2,0.3333
+KNN (k=7),5,subject_01,2,1.0,1.0,1.0,1.0
+KNN (k=7),6,subject_02,2,0.5,0.5,1.0,0.6667
+KNN (k=7),7,subject_03,2,0.5,0.5,1.0,0.6667
+KNN (k=7),8,subject_04,2,1.0,1.0,1.0,1.0
+KNN (k=7),9,subject_07,2,0.5,0.5,1.0,0.6667
+KNN (k=7),10,subject_08,2,0.0,0.0,0.0,0.0
+KNN (k=7),11,subject_09,2,0.5,0.5,1.0,0.6667
+KNN (k=7),12,subject_10,2,0.0,0.0,0.0,0.0
+KNN (k=7),13,subject_12,2,0.0,0.0,0.0,0.0
+KNN (k=7),14,subject_13,2,0.5,0.5,1.0,0.6667
+KNN (k=7),15,subject_14,2,0.5,0.5,1.0,0.6667
+KNN (k=7),16,subject_15,2,0.0,0.0,0.0,0.0
+KNN (k=7),17,subject_16,2,0.5,0.0,0.0,0.0
+KNN (k=7),18,subject_17,2,0.0,0.0,0.0,0.0
+KNN (k=7),19,subject_18,2,0.5,0.5,1.0,0.6667
+KNN (k=7),20,subject_19,2,0.5,0.0,0.0,0.0
+KNN (k=7),21,subject_00,2,0.0,0.0,0.0,0.0
+KNN (k=7),22,subject_11,1,0.0,0.0,0.0,0.0
+Random Forest,1,subject_21,34,0.8529,0.7727,1.0,0.8718
+Random Forest,2,subject_20,16,1.0,1.0,1.0,1.0
+Random Forest,3,subject_05,16,0.6875,0.6364,0.875,0.7368
+Random Forest,4,subject_06,10,0.5,0.0,0.0,0.0
+Random Forest,5,subject_01,2,0.5,0.0,0.0,0.0
+Random Forest,6,subject_02,2,0.5,0.5,1.0,0.6667
+Random Forest,7,subject_03,2,0.5,0.5,1.0,0.6667
+Random Forest,8,subject_04,2,1.0,1.0,1.0,1.0
+Random Forest,9,subject_07,2,1.0,1.0,1.0,1.0
+Random Forest,10,subject_08,2,0.5,0.5,1.0,0.6667
+Random Forest,11,subject_09,2,0.5,0.5,1.0,0.6667
+Random Forest,12,subject_10,2,0.0,0.0,0.0,0.0
+Random Forest,13,subject_12,2,0.5,0.5,1.0,0.6667
+Random Forest,14,subject_13,2,1.0,1.0,1.0,1.0
+Random Forest,15,subject_14,2,0.5,0.5,1.0,0.6667
+Random Forest,16,subject_15,2,0.5,0.5,1.0,0.6667
+Random Forest,17,subject_16,2,0.5,0.0,0.0,0.0
+Random Forest,18,subject_17,2,0.5,0.5,1.0,0.6667
+Random Forest,19,subject_18,2,0.5,0.5,1.0,0.6667
+Random Forest,20,subject_19,2,0.5,0.0,0.0,0.0
+Random Forest,21,subject_00,2,0.5,0.0,0.0,0.0
+Random Forest,22,subject_11,1,1.0,1.0,1.0,1.0
+Gradient Boosting,1,subject_21,34,0.9118,0.8889,0.9412,0.9143
+Gradient Boosting,2,subject_20,16,1.0,1.0,1.0,1.0
+Gradient Boosting,3,subject_05,16,0.4375,0.4444,0.5,0.4706
+Gradient Boosting,4,subject_06,10,0.7,1.0,0.4,0.5714
+Gradient Boosting,5,subject_01,2,0.5,0.0,0.0,0.0
+Gradient Boosting,6,subject_02,2,0.5,0.5,1.0,0.6667
+Gradient Boosting,7,subject_03,2,0.5,0.5,1.0,0.6667
+Gradient Boosting,8,subject_04,2,1.0,1.0,1.0,1.0
+Gradient Boosting,9,subject_07,2,1.0,1.0,1.0,1.0
+Gradient Boosting,10,subject_08,2,1.0,1.0,1.0,1.0
+Gradient Boosting,11,subject_09,2,0.0,0.0,0.0,0.0
+Gradient Boosting,12,subject_10,2,0.0,0.0,0.0,0.0
+Gradient Boosting,13,subject_12,2,0.5,0.5,1.0,0.6667
+Gradient Boosting,14,subject_13,2,0.5,0.5,1.0,0.6667
+Gradient Boosting,15,subject_14,2,0.5,0.5,1.0,0.6667
+Gradient Boosting,16,subject_15,2,0.5,0.5,1.0,0.6667
+Gradient Boosting,17,subject_16,2,0.5,0.0,0.0,0.0
+Gradient Boosting,18,subject_17,2,0.5,0.5,1.0,0.6667
+Gradient Boosting,19,subject_18,2,0.5,0.5,1.0,0.6667
+Gradient Boosting,20,subject_19,2,0.5,0.0,0.0,0.0
+Gradient Boosting,21,subject_00,2,0.5,0.0,0.0,0.0
+Gradient Boosting,22,subject_11,1,1.0,1.0,1.0,1.0

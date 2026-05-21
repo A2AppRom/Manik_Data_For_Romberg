@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Romberger — Balance Assessment</title>
-  <meta name="description" content="Classify normal vs impaired balance from smartphone accelerometer data using an SVM model trained on Romberg test recordings.">
+  <meta name="description" content="Classify normal vs impaired balance from smartphone accelerometer data using a KNN model trained on Romberg test recordings.">
   <meta property="og:title" content="Romberger — Balance Assessment">
   <meta property="og:description" content="Upload accelerometer CSVs and get instant balance predictions (eyes open vs closed). Explore the training pipeline, dataset, and model performance.">
   <meta property="og:type" content="website">
@@ -517,7 +517,7 @@
     <div class="step reveal reveal-delay-2">
       <div class="step-number">3</div>
       <h4>Classify</h4>
-      <p>The model extracts 6 features and predicts normal vs impaired balance instantly in your browser.</p>
+      <p>The model extracts 12 features and predicts normal vs impaired balance instantly in your browser.</p>
     </div>
   </div>
 </div>
@@ -526,26 +526,27 @@
 <section id="dataset-section">
   <p class="section-label reveal">Dataset</p>
   <h2 class="section-title reveal">Romberg test training data</h2>
-  <p class="section-desc reveal">The model was trained on accelerometer recordings collected from 9 subjects using the Sensor Logger app at ~100 Hz. Each subject stood still for 30 seconds with eyes open (normal balance) and eyes closed (impaired balance).</p>
+  <p class="section-desc reveal">The model was trained on accelerometer recordings collected from 22 subjects using the Sensor Logger app at ~100 Hz. Each subject stood still for 30 seconds with eyes open (normal balance) and eyes closed (impaired balance).</p>
 
   <div class="dataset-stats" style="margin-top:1.5rem">
-    <div class="stat-card"><div class="stat-num">9</div><div class="stat-lbl">Subjects</div></div>
-    <div class="stat-card"><div class="stat-num">142</div><div class="stat-lbl">30s recordings</div></div>
+    <div class="stat-card"><div class="stat-num">22</div><div class="stat-lbl">Subjects</div></div>
+    <div class="stat-card"><div class="stat-num">111</div><div class="stat-lbl">30s recordings</div></div>
     <div class="stat-card"><div class="stat-num">~100 Hz</div><div class="stat-lbl">Sampling rate</div></div>
-    <div class="stat-card"><div class="stat-num">6</div><div class="stat-lbl">Features extracted</div></div>
+    <div class="stat-card"><div class="stat-num">12</div><div class="stat-lbl">Features extracted</div></div>
   </div>
 
   <div class="charts-row" style="margin-top:1.5rem">
     <div class="chart-card">
       <h4>Data collection</h4>
-      <p class="chart-sub">Recordings from 9 subjects, split into 30-second chunks</p>
+      <p class="chart-sub">Recordings from 22 subjects, split into 30-second chunks</p>
       <table class="metrics-table">
         <thead><tr><th>Subject</th><th>Condition</th><th>Recordings</th></tr></thead>
         <tbody>
-          <tr><td>Jack (subject_09)</td><td><span class="badge badge-open">Open</span> / <span class="badge badge-closed">Closed</span></td><td>61 chunks</td></tr>
-          <tr><td>Igor (subject_05)</td><td><span class="badge badge-open">Open</span> / <span class="badge badge-closed">Closed</span></td><td>45 chunks</td></tr>
-          <tr><td>Syed (subject_06)</td><td><span class="badge badge-open">Open</span> / <span class="badge badge-closed">Closed</span></td><td>24 chunks</td></tr>
-          <tr><td>6 others</td><td><span class="badge badge-open">Open</span> / <span class="badge badge-closed">Closed</span></td><td>12 chunks</td></tr>
+          <tr><td>Jack (subject_21)</td><td><span class="badge badge-open">Open</span> / <span class="badge badge-closed">Closed</span></td><td>34 chunks</td></tr>
+          <tr><td>Subject21 (subject_20)</td><td><span class="badge badge-open">Open</span> / <span class="badge badge-closed">Closed</span></td><td>16 chunks</td></tr>
+          <tr><td>Igor (subject_05)</td><td><span class="badge badge-open">Open</span> / <span class="badge badge-closed">Closed</span></td><td>16 chunks</td></tr>
+          <tr><td>Syed (subject_06)</td><td><span class="badge badge-open">Open</span> / <span class="badge badge-closed">Closed</span></td><td>10 chunks</td></tr>
+          <tr><td>14 others</td><td><span class="badge badge-open">Open</span> / <span class="badge badge-closed">Closed</span></td><td>35 chunks</td></tr>
         </tbody>
       </table>
     </div>
@@ -555,23 +556,21 @@
       <div style="font-size:.84rem;color:var(--text-muted);line-height:1.7">
         <p><strong style="color:var(--text)">1. Clean</strong> raw recordings &#8212; trim phone-handling artifacts from start and end</p>
         <p style="margin-top:.5rem"><strong style="color:var(--text)">2. Chunk</strong> longer recordings into 30-second segments (~3000 samples each)</p>
-        <p style="margin-top:.5rem"><strong style="color:var(--text)">3. Extract</strong> 6 statistical features per chunk from sway magnitude:</p>
+        <p style="margin-top:.5rem"><strong style="color:var(--text)">3. Extract</strong> 12 features per chunk from sway magnitude:</p>
         <ul style="margin:.4rem 0 .5rem 1.2rem">
-          <li>Mean &amp; Median (central sway tendency)</li>
-          <li>Standard Deviation (sway variability)</li>
-          <li>Skewness &amp; Kurtosis (distribution shape)</li>
-          <li>Path Length (cumulative movement)</li>
+          <li>6 global: Mean, Median, Std, Skewness, Kurtosis, Path Length</li>
+          <li>6 temporal: Std of each feature across 6 time windows</li>
         </ul>
-        <p><strong style="color:var(--text)">4. Classify</strong> with SVM (linear kernel)</p>
+        <p><strong style="color:var(--text)">4. Classify</strong> with KNN (k=7, distance-weighted)</p>
       </div>
     </div>
   </div>
 
   <div class="dataset-stats" style="margin-top:1.5rem">
-    <div class="stat-card"><div class="stat-num">142</div><div class="stat-lbl">Total samples</div></div>
-    <div class="stat-card"><div class="stat-num">68</div><div class="stat-lbl">Eyes open</div></div>
-    <div class="stat-card"><div class="stat-num">74</div><div class="stat-lbl">Eyes closed</div></div>
-    <div class="stat-card"><div class="stat-num">6</div><div class="stat-lbl">Features per sample</div></div>
+    <div class="stat-card"><div class="stat-num">111</div><div class="stat-lbl">Total samples</div></div>
+    <div class="stat-card"><div class="stat-num">56</div><div class="stat-lbl">Eyes open</div></div>
+    <div class="stat-card"><div class="stat-num">55</div><div class="stat-lbl">Eyes closed</div></div>
+    <div class="stat-card"><div class="stat-num">12</div><div class="stat-lbl">Features per sample</div></div>
   </div>
 </section>
 
@@ -579,28 +578,28 @@
 <section id="performance-section">
   <p class="section-label reveal">Performance</p>
   <h2 class="section-title reveal">Model evaluation</h2>
-  <p class="section-desc reveal">SVM (linear kernel) evaluated with leave-one-subject-out cross-validation using GroupKFold &#8212; each fold holds out all recordings from one subject, ensuring the model never trains on the test subject's data.</p>
+  <p class="section-desc reveal">KNN (k=7, distance-weighted) evaluated with leave-one-subject-out cross-validation using GroupKFold &#8212; each fold holds out all recordings from one subject, ensuring the model never trains on the test subject's data.</p>
 
   <div class="accuracy-card">
-    <div class="accuracy-big">73.9%</div>
-    <div class="accuracy-label">Leave-one-subject-out cross-validation accuracy (9 folds)</div>
-    <div class="model-badge" style="margin-top:.8rem"><span class="dot"></span> SVM Linear &#8212; balanced class weights, StandardScaler</div>
+    <div class="accuracy-big">81.6%</div>
+    <div class="accuracy-label">Leave-one-subject-out cross-validation accuracy (22 folds, weighted)</div>
+    <div class="model-badge" style="margin-top:.8rem"><span class="dot"></span> KNN (k=7) &#8212; distance-weighted, StandardScaler</div>
   </div>
 
   <div class="charts-row" style="margin-top:1.5rem">
     <div class="chart-card" style="text-align:center">
       <h4>Confusion matrix</h4>
-      <p class="chart-sub">Predicted vs actual across all 9 LOSO CV folds</p>
+      <p class="chart-sub">Predicted vs actual across all 22 LOSO CV folds</p>
       <div class="confusion-grid">
         <div></div>
         <div class="header">Pred. Closed</div>
         <div class="header">Pred. Open</div>
         <div class="header" style="text-align:right">Actual Closed</div>
-        <div class="cell cell-correct">52</div>
-        <div class="cell cell-incorrect">22</div>
+        <div class="cell cell-correct">35</div>
+        <div class="cell cell-incorrect">20</div>
         <div class="header" style="text-align:right">Actual Open</div>
-        <div class="cell cell-incorrect">15</div>
-        <div class="cell cell-correct">53</div>
+        <div class="cell cell-incorrect">16</div>
+        <div class="cell cell-correct">40</div>
       </div>
     </div>
     <div class="chart-card">
@@ -609,12 +608,12 @@
       <table class="metrics-table">
         <thead><tr><th>Class</th><th>Precision</th><th>Recall</th><th>F1</th></tr></thead>
         <tbody>
-          <tr><td><span class="badge badge-closed">Eyes Closed</span></td><td>78%</td><td>70%</td><td>74%</td></tr>
-          <tr><td><span class="badge badge-open">Eyes Open</span></td><td>71%</td><td>78%</td><td>74%</td></tr>
+          <tr><td><span class="badge badge-closed">Eyes Closed</span></td><td>67%</td><td>71%</td><td>69%</td></tr>
+          <tr><td><span class="badge badge-open">Eyes Open</span></td><td>69%</td><td>64%</td><td>66%</td></tr>
         </tbody>
       </table>
       <div style="margin-top:1rem;font-size:.82rem;color:var(--text-muted)">
-        <strong style="color:var(--text)">Model choice:</strong> SVM (Linear) was chosen over Logistic Regression and SVM (RBF). It matches the project specification, achieves 73.9% aggregate accuracy, and shows the lowest fold variance (&plusmn;0.21).
+        <strong style="color:var(--text)">Model choice:</strong> KNN (k=7, distance-weighted) was selected after comparing 8 models. It achieves 81.6% weighted accuracy on meaningful LOSO folds (subjects with &gt;2 test samples) across 22 subjects.
       </div>
     </div>
   </div>
@@ -627,7 +626,7 @@
 
   <div class="chart-card" style="margin-top:1.5rem">
     <h4>Feature importance</h4>
-    <p class="chart-sub">Absolute SVM weight &#8212; higher means more influential for the classification decision</p>
+    <p class="chart-sub">Mean feature difference between classes &#8212; higher means more discriminative</p>
     <canvas id="featureImportanceChart" height="200"></canvas>
   </div>
 </section>
@@ -636,7 +635,7 @@
 <section id="pipeline-section">
   <p class="section-label reveal">Pipeline</p>
   <h2 class="section-title reveal">Training pipeline</h2>
-  <p class="section-desc reveal">The Python scripts used to consolidate data, extract features, compare models, and train the final SVM classifier. The pipeline runs as standalone scripts.</p>
+  <p class="section-desc reveal">The Python scripts used to consolidate data, extract features, compare models, and train the final KNN classifier. The pipeline runs as standalone scripts.</p>
 
   <div class="charts-row" style="margin-top:1.5rem">
     <div class="chart-card">
@@ -648,7 +647,7 @@
           <tr><td style="font-weight:600">consolidate_data.py</td><td>Merge recordings from 5 repos into unified structure</td></tr>
           <tr><td style="font-weight:600">clean_data.py</td><td>Trim phone-handling artifacts from start/end</td></tr>
           <tr><td style="font-weight:600">chunk_data.py</td><td>Split longer recordings into 30-second segments</td></tr>
-          <tr><td style="font-weight:600">extract_features.py</td><td>Compute 6 features per chunk &#8594; features_dataset.csv</td></tr>
+          <tr><td style="font-weight:600">extract_features.py</td><td>Compute 12 features per chunk &#8594; features_dataset.csv</td></tr>
         </tbody>
       </table>
     </div>
@@ -658,8 +657,8 @@
       <table class="metrics-table">
         <thead><tr><th>Script</th><th>Purpose</th></tr></thead>
         <tbody>
-          <tr><td style="font-weight:600">train_model_comparison.py</td><td>Compare SVM (RBF), SVM (Linear), LogReg with GroupKFold</td></tr>
-          <tr><td style="font-weight:600">train_final_model.py</td><td>Train SVM Linear on all 142 samples, export weights</td></tr>
+          <tr><td style="font-weight:600">train_model_comparison.py</td><td>Compare SVM, LogReg, KNN, RF, GB with GroupKFold LOSO</td></tr>
+          <tr><td style="font-weight:600">train_final_model.py</td><td>Train KNN (k=7) on all 111 samples, export training data</td></tr>
         </tbody>
       </table>
     </div>
@@ -816,34 +815,40 @@ themeToggle.addEventListener('click', () => {
 });
 
 /* ==========================================================
-   EMBEDDED MODEL WEIGHTS (from train_final_model.py — SVM Linear)
+   EMBEDDED MODEL (from train_final_model.py — KNN k=7)
 ========================================================== */
 const MODEL = {
-  feature_names: ["mean","median","std","skewness","kurtosis","path_length"],
-  scaler_mean: [0.12884556792572224,0.11136093998619306,0.08217374778670732,2.0376234252701604,12.80184781158191,125.10615775470566],
-  scaler_std: [0.045133847327176055,0.03563536555948225,0.05982481199494128,1.8077324941978443,37.799432270925315,32.934124185713905],
-  weights: [-0.7124851687616154,-1.630074510121072,0.4237209760180871,0.33579639354801194,-0.5011842804981861,1.0556923353687635],
-  bias: -0.21889522234118264,
-  classes: ["closed","open"],
+  feature_names: ["mean", "median", "std", "skewness", "kurtosis", "path_length", "temporal_mean", "temporal_median", "temporal_std", "temporal_skewness", "temporal_kurtosis", "temporal_path_length"],
+  scaler_mean: [0.13894285, 0.11135116, 0.10756424, 2.20435361, 11.85482708, 0.03958893, 0.03995274, 0.03139415, 0.03727717, 0.57386868, 4.08776452, 0.00840909],
+  scaler_std: [0.09272283, 0.0512522, 0.16446603, 1.4426618, 20.10547815, 0.01748283, 0.09832397, 0.06139319, 0.10624668, 0.61169043, 8.27318426, 0.01706883],
+  k: 7,
+  classes: ["closed", "open"],
+  training_features: [[-0.609973, -0.691834, -0.411207, -0.948961, -0.559725, -1.227197, -0.275479, -0.302151, -0.301201, -0.446237, -0.385738, -0.429697], [0.432937, 0.171564, 0.505688, 0.684073, 0.032983, 0.048088, 0.844446, 1.432589, 0.557513, 1.030969, 0.388361, 1.61423], [-0.052353, -0.077804, 0.00996, 0.783014, 0.177928, -0.788226, -0.013481, -0.257981, 0.169571, -0.125497, -0.26753, -0.110473], [-0.803953, -1.042093, -0.444374, -0.712722, -0.490353, -1.257206, -0.373847, -0.454394, -0.338294, -0.64072, -0.375713, -0.450328], [-0.513257, -0.588847, -0.332975, -0.396692, -0.365428, -0.264654, -0.353868, -0.42199, -0.32802, -0.459383, -0.266181, -0.431865], [-0.643021, -0.908308, -0.334295, -0.270394, -0.337862, -0.530798, -0.258267, -0.237388, -0.285227, -0.453997, -0.351244, -0.367687], [-0.453829, -0.590941, -0.289994, -0.501752, -0.45003, 0.020471, -0.318851, -0.346389, -0.309012, -0.601381, -0.40152, -0.333169], [-0.669628, -0.883683, -0.37126, -0.453361, -0.413371, -0.480343, -0.275833, -0.295881, -0.311714, -0.710539, -0.421479, -0.329987], [-0.30056, -0.038125, -0.343152, -1.044816, -0.516462, -0.734631, -0.251656, -0.209085, -0.188326, 3.578732, 4.190068, 0.183622], [1.924491, 0.171174, 2.490809, 0.919893, 0.175495, 3.230692, 2.783652, 2.857154, 2.45249, 0.285722, 0.007404, 4.397185], [-0.581552, -0.795854, -0.316153, -0.136504, -0.281958, -0.187393, -0.301725, -0.389871, -0.263697, -0.579082, -0.32351, -0.297079], [-0.524391, -0.67452, -0.301445, -0.120593, -0.294764, -0.036819, -0.345771, -0.43672, -0.301609, -0.580317, -0.360283, -0.334318], [-0.182143, -0.214887, -0.123486, 0.104503, -0.204883, 0.704432, -0.248023, -0.32032, -0.199901, -0.417228, -0.268167, -0.332181], [-0.378344, -0.507091, -0.211833, 0.375588, 0.231453, 0.193517, -0.294142, -0.377339, -0.205451, -0.077147, 0.078339, -0.237369], [0.14179, 0.398073, -0.02296, 1.116486, 1.014432, 1.052127, -0.148612, -0.238115, -0.032435, 1.15564, 0.892466, 0.050082], [-0.404309, -0.52542, -0.242246, -0.004845, -0.177451, 0.089752, -0.248032, -0.333656, -0.208815, -0.296893, -0.187296, -0.158338], [-0.198811, -0.024765, -0.270245, -0.596158, -0.428484, 0.368062, -0.236471, -0.288397, -0.236933, -0.57145, -0.391102, 0.009573], [-0.445907, -0.507398, -0.292471, -0.146084, -0.240183, -0.068739, -0.284583, -0.377899, -0.231495, -0.05843, -0.170603, -0.34426], [-0.15505, 0.011665, -0.253857, -0.395621, -0.331556, 0.581027, -0.317095, -0.413707, -0.250449, -0.461976, -0.272381, -0.042055], [1.094724, -0.035237, 2.164892, 2.675373, 2.010489, 2.329835, 1.927181, 1.595447, 2.603327, 0.404981, -0.004155, 3.478958], [0.054916, 0.349388, -0.167045, -0.494665, -0.400401, 0.846886, -0.273773, -0.283721, -0.283067, -0.487359, -0.317732, -0.135947], [-0.270891, -0.224688, -0.258443, -0.434373, -0.393996, 0.280299, -0.257213, -0.275009, -0.286744, -0.526908, -0.327581, -0.220955], [0.074567, 0.44743, -0.21332, -0.704928, -0.447513, 0.535793, -0.31862, -0.392857, -0.278223, -0.552934, -0.245645, -0.259131], [-0.297283, -0.437421, -0.094235, 1.510646, 0.99813, 0.336561, -0.035417, -0.172566, 0.05866, -0.2364, -0.196422, 0.475514], [0.313677, 0.781173, -0.110032, -0.559275, -0.420919, 0.975868, -0.325325, -0.411947, -0.255286, -0.536552, -0.368921, -0.250477], [-0.180832, -0.067199, -0.152689, 0.942079, 0.685523, 0.465942, -0.268553, -0.373626, -0.107819, 0.65243, 0.227402, -0.004183], [0.593413, 1.281604, -0.045528, -0.554791, -0.396616, 0.900898, -0.210708, -0.225367, -0.256863, -0.335604, -0.281532, -0.324422], [-0.040329, 0.261186, -0.259523, -0.825929, -0.492274, 0.247851, -0.292901, -0.341715, -0.2983, -0.665685, -0.375064, -0.301102], [0.480734, 1.077115, -0.026824, 0.217364, 0.252779, 0.837183, -0.086908, -0.067244, -0.105232, 0.836848, 0.526908, 0.015785], [-0.187685, 0.055976, -0.295778, -0.989232, -0.551135, 0.083171, -0.312125, -0.326509, -0.328739, -0.548323, -0.408355, -0.292865], [0.141916, 0.500901, -0.138229, -0.294854, -0.288135, -0.04154, -0.228595, -0.275368, -0.15756, -0.210286, -0.292838, -0.284786], [-0.181301, 0.046644, -0.275079, -0.476342, -0.309471, -0.505999, -0.240081, -0.29972, -0.223208, -0.018118, -0.23844, -0.321773], [0.179537, 0.517873, -0.118949, -0.309797, -0.284822, 0.044411, -0.290772, -0.413009, -0.186403, -0.236204, -0.268411, -0.4285], [-0.146898, -0.015631, -0.242868, -0.550812, -0.429321, -0.204012, -0.230428, -0.294739, -0.215584, -0.520958, -0.391347, -0.273646], [0.570844, 1.194234, -0.027598, -0.6499, -0.443941, 0.932321, -0.215743, -0.226934, -0.235906, -0.429124, -0.284269, -0.285365], [-0.227952, -0.078475, -0.276181, -0.541701, -0.413265, -0.344053, -0.189557, -0.205739, -0.231984, -0.561383, -0.400284, -0.27736], [-0.849902, -1.096116, -0.465042, -0.59085, -0.421506, -1.299405, -0.265921, -0.309573, -0.285568, -0.724751, -0.444353, -0.437989], [-0.83251, -1.165787, -0.26683, 5.559392, 7.382589, -1.071092, -0.203584, -0.353145, 0.035843, 1.709542, 1.094257, 0.050961], [-0.487059, -0.55575, -0.318689, -0.385329, -0.363306, -1.139668, -0.297072, -0.396734, -0.238093, -0.191962, -0.340573, -0.380405], [-0.331561, -0.485928, -0.13107, 0.687024, 0.137944, -1.087098, 0.003949, -0.183655, 0.044999, -0.480413, -0.397267, -0.085557], [-0.381072, -0.433764, -0.251089, -0.353357, -0.36316, -0.974177, -0.194295, -0.251484, -0.204401, -0.40169, -0.306275, -0.169943], [-0.384422, -0.516772, -0.282853, -0.37815, -0.400178, -0.963727, -0.302341, -0.391949, -0.197517, -0.196746, -0.180217, -0.050281], [-1.334984, -1.88487, -0.616007, -1.232096, -0.583874, -1.879916, -0.398811, -0.498768, -0.347751, -0.736391, -0.461426, -0.468757], [-1.252673, -1.7646, -0.564495, 3.042546, 2.683723, -1.729042, -0.369791, -0.49278, -0.273861, 2.010066, 1.224799, -0.388377], [2.303623, 3.905479, 1.385249, 1.730749, 1.734136, 0.169014, 0.571652, 1.785989, 1.343235, 2.014425, 0.750288, 0.706501], [-0.376089, -0.32024, -0.32084, -0.729586, -0.452334, -0.546596, -0.270462, -0.328281, -0.280823, -0.165631, -0.232116, -0.201836], [-0.266915, -0.452627, -0.120844, 0.496094, 0.018419, -0.700318, 0.030457, -0.018666, 0.047067, 6.266729, 7.629674, 0.319823], [-0.759449, -0.943048, -0.432127, 0.145919, 0.166042, -1.319073, -0.340542, -0.420697, -0.265486, 0.746609, 0.202441, -0.35785], [-0.524689, -0.768285, -0.217383, 0.752486, 0.2164, -1.1315, -0.118479, -0.203495, -0.043123, 1.08066, 0.186413, -0.157402], [7.509, 1.276666, 9.276555, 0.469861, -0.172744, 5.872845, 9.373814, 8.817503, 9.359644, -0.219761, -0.184734, 8.041765], [-0.439224, -0.438103, -0.333819, -0.774249, -0.494348, -0.617415, -0.145996, -0.056876, -0.30051, -0.20239, -0.280059, -0.358036], [-0.807055, -1.049664, -0.424245, 0.777576, 1.013474, -1.259902, -0.3169, -0.360122, -0.260094, 1.877926, 1.348846, -0.401755], [1.523758, 1.736724, 1.069367, 0.909603, 0.311094, -0.049021, 1.220973, 1.630759, 0.809103, 1.339331, 0.965472, 0.749608], [1.69853, 2.876083, 0.467128, -0.870516, -0.561525, 3.595595, 0.176493, 0.456988, -0.093191, -0.495036, -0.40499, 0.756732], [1.516566, 1.836845, 0.980366, 1.208159, 0.832173, 1.834323, 1.110662, 1.437517, 0.816457, -0.057504, -0.091382, 1.02298], [-0.709052, -0.997654, -0.342107, 0.383365, 0.139853, -0.953599, -0.254673, -0.34589, -0.183299, 0.097999, -0.024419, -0.23664], [-0.679763, -0.985366, -0.243136, 1.795948, 1.300985, -0.754996, -0.185565, -0.290586, -0.037238, 0.958487, 0.436944, 0.095773], [-0.596696, -0.923108, -0.262259, -0.06896, -0.33995, -0.111857, -0.319112, -0.371174, -0.317895, -0.690083, -0.393006, -0.359511], [-0.488634, -0.736629, -0.206488, 0.236335, -0.143013, 0.027932, -0.253128, -0.267788, -0.274222, -0.558429, -0.256631, -0.165165], [1.15949, 1.190306, 0.737221, 0.308338, -0.121397, 0.195035, 0.219238, 0.169856, 0.354146, 0.123059, -0.130565, 0.042709], [0.962357, 1.541095, 0.29978, 0.659171, 0.271042, -0.105215, 0.035765, -0.062811, 0.286961, -0.229171, -0.253366, 0.165221], [0.944705, 1.661279, 0.266975, 0.526129, 0.223098, 0.377398, 0.298459, 0.326038, 0.19403, -0.043089, -0.272138, -0.115376], [-0.489446, -0.575661, -0.31867, -0.455095, -0.430265, -0.084475, -0.305299, -0.349266, -0.313001, -0.680509, -0.392819, -0.283554], [0.026159, 0.211496, -0.140971, -0.791029, -0.546555, -0.080813, 0.037451, 0.195814, -0.202367, -0.3477, -0.360356, -0.24452], [-0.518627, -0.621101, -0.331343, -0.428654, -0.389556, -0.26002, -0.334141, -0.387199, -0.317783, -0.70466, -0.379456, -0.307123], [0.940029, 1.430954, 0.271681, -0.688624, -0.506152, 0.520871, 0.123042, 0.45512, -0.082843, 0.058494, -0.217206, 0.070248], [-0.561873, -0.73169, -0.325451, -0.331344, -0.389877, -0.16786, -0.367599, -0.433691, -0.334696, -0.657813, -0.385676, -0.355803], [0.910604, 1.475733, 0.215172, -0.686876, -0.506055, 0.40991, 0.105805, 0.277676, -0.081928, -0.526885, -0.41189, -0.098459], [-0.575226, -0.708107, -0.357265, -0.608413, -0.46262, -0.208271, -0.333096, -0.384535, -0.323878, -0.712657, -0.371523, -0.348567], [0.084298, 0.24038, -0.081155, -0.603344, -0.474471, 0.164461, -0.096373, 0.011661, -0.130113, -0.339778, -0.358324, -0.341509], [0.142315, 0.528006, -0.158132, -0.654878, -0.459052, 0.315333, 0.002806, 0.200855, -0.304639, -0.080068, -0.286211, -0.28102], [-0.086931, 0.048465, -0.14801, -0.337399, -0.291358, -0.216374, -0.264376, -0.173433, -0.259046, 0.668379, 0.206947, -0.277022], [-0.878914, -1.195188, -0.449847, -0.533697, -0.440002, -0.913695, -0.377689, -0.460997, -0.340898, -0.587887, -0.339828, -0.414902], [0.281733, 0.552162, 0.031012, 0.000821, -0.176172, 0.357042, -0.041288, -0.065781, -0.038269, 0.256655, 0.093992, -0.141916], [-0.589001, -0.764415, -0.336814, -0.494958, -0.425098, -0.124281, -0.308913, -0.332004, -0.318128, -0.802587, -0.409851, -0.387705], [0.091445, -0.144931, 0.128557, -0.1445, -0.37209, -0.060252, 0.087583, 0.026982, 0.086183, -0.115166, -0.125397, -0.020781], [-0.733252, -0.956647, -0.393343, -0.119492, -0.184769, -0.678351, -0.364511, -0.471612, -0.271198, -0.101655, -0.185099, -0.40002], [0.491125, 1.131579, -0.08007, -0.796926, -0.496211, 0.157787, -0.078278, -0.03239, -0.188142, -0.486072, -0.37311, -0.203185], [-0.546382, -0.592972, -0.386377, -0.653035, -0.460482, -0.45754, -0.34811, -0.419659, -0.326879, -0.504355, -0.394939, -0.374859], [1.073443, 1.98769, 0.174314, -0.658597, -0.451112, 0.442422, 0.257108, 0.629403, -0.051495, -0.680081, -0.453649, 0.037052], [-0.546382, -0.592972, -0.386377, -0.653035, -0.460482, -0.45754, -0.34811, -0.419659, -0.326879, -0.504355, -0.394939, -0.374859], [0.079655, 0.235625, -0.081845, -0.598604, -0.474084, 0.177556, -0.139809, -0.043755, -0.150888, -0.267909, -0.333109, -0.310751], [0.1385, 0.521872, -0.157812, -0.65291, -0.458521, 0.313011, 0.002761, 0.195069, -0.301434, -0.111926, -0.298879, -0.260459], [-0.089697, 0.033634, -0.147639, -0.334168, -0.291577, -0.215687, -0.26708, -0.184825, -0.258579, 0.61687, 0.158814, -0.281198], [-0.87956, -1.197067, -0.449812, -0.531361, -0.439685, -0.914192, -0.376627, -0.461406, -0.340657, -0.595571, -0.338993, -0.40693], [0.29318, 0.568861, 0.028523, 0.00613, -0.172424, 0.385478, 0.050073, 0.057572, -0.050273, 0.029977, 0.020965, -0.028982], [-0.591157, -0.773674, -0.334964, -0.507994, -0.429355, -0.122568, -0.305564, -0.326866, -0.318137, -0.780681, -0.406229, -0.386913], [0.083776, -0.149435, 0.124537, -0.131004, -0.365871, -0.067456, 0.100726, 0.041895, 0.103602, -0.358432, -0.297544, 0.011782], [-0.732939, -0.956647, -0.393262, -0.121423, -0.185665, -0.677114, -0.364525, -0.47495, -0.271441, -0.11027, -0.187104, -0.400725], [0.294204, 0.624237, 0.099972, 1.979151, 1.836504, 0.840005, -0.018742, -0.044126, 0.183816, 0.614151, 0.226772, 0.041382], [-0.423729, -0.512294, -0.261833, 0.948411, 1.448423, -0.120655, -0.134897, -0.044157, -0.236122, 3.239203, 3.968913, -0.261328], [0.037092, 0.351494, -0.167669, 1.205285, 1.88458, 0.047784, -0.213067, -0.255486, -0.128363, 1.748461, 1.502045, -0.20093], [-0.646582, -0.862458, -0.365727, -0.529058, -0.465094, -0.360906, -0.355519, -0.419467, -0.322387, -0.685171, -0.419761, -0.357756], [-0.416336, -0.367483, -0.345684, -0.877841, -0.534588, -0.472331, -0.328004, -0.383056, -0.310407, -0.656826, -0.390087, -0.422324], [-0.7442, -0.992515, -0.380592, -0.545466, -0.461455, -0.666916, -0.248037, -0.24244, -0.297199, 0.514489, 0.201564, 0.041273], [1.724148, 2.39592, 0.923119, 1.194775, 0.644211, 1.578024, 1.093873, 1.432484, 0.823767, 0.14726, -0.1854, 1.166841], [-0.669628, -0.883683, -0.37126, -0.453361, -0.413371, -0.480343, -0.275833, -0.295881, -0.311714, -0.710539, -0.421479, -0.329987], [1.018926, 1.929572, 0.085146, -0.90846, -0.550925, 0.723056, -0.097523, -0.086252, -0.197278, -0.633833, -0.436005, -0.27912], [-0.669628, -0.883683, -0.37126, -0.453361, -0.413371, -0.480343, -0.275833, -0.295881, -0.311714, -0.710539, -0.421479, -0.329987], [0.134719, 0.104925, 0.285089, 3.35624, 3.455342, -0.276895, 0.174201, -0.044367, 0.542844, 0.968938, 0.39794, 0.184036], [-0.643021, -0.908308, -0.334295, -0.270394, -0.337862, -0.530798, -0.258267, -0.237388, -0.285227, -0.453997, -0.351244, -0.367687], [0.476362, 0.86342, 0.157985, 1.100985, 0.768536, -0.163708, 0.249243, 0.287152, 0.205429, 0.577689, 0.019796, 0.01456], [-0.643021, -0.908308, -0.334295, -0.270394, -0.337862, -0.530798, -0.258267, -0.237388, -0.285227, -0.453997, -0.351244, -0.367687], [0.953911, 1.70929, 0.267888, 0.509436, 0.216072, 0.401485, 0.237357, 0.211393, 0.210627, -0.02512, -0.283535, -0.130237], [-0.488031, -0.574529, -0.318545, -0.45731, -0.431026, -0.081685, -0.304626, -0.351721, -0.310226, -0.68518, -0.398656, -0.27888], [0.024288, 0.211496, -0.142634, -0.790314, -0.545268, -0.080399, 0.034627, 0.192805, -0.204118, -0.364161, -0.361541, -0.238293], [-0.517757, -0.61921, -0.331137, -0.432434, -0.390784, -0.258326, -0.333847, -0.385725, -0.318623, -0.720076, -0.387333, -0.31801], [0.94203, 1.438655, 0.271392, -0.689657, -0.506188, 0.524707, 0.12012, 0.45224, -0.081449, 0.043946, -0.226415, 0.073921], [-0.562518, -0.73169, -0.325708, -0.328734, -0.388778, -0.169677, -0.367291, -0.438552, -0.333744, -0.639803, -0.377269, -0.351976], [0.906038, 1.475733, 0.211815, -0.678319, -0.500949, 0.417104, 0.11097, 0.28203, -0.080316, -0.469933, -0.382222, -0.111281], [-0.57372, -0.708481, -0.356794, -0.618283, -0.465109, -0.207874, -0.334221, -0.384254, -0.325034, -0.649318, -0.354775, -0.346668]],
+  training_labels: [0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1],
   per_subject_accuracy: [
-    {subject:"Person1",accuracy:0.500,n:2},
-    {subject:"Person2",accuracy:1.000,n:2},
-    {subject:"Person3",accuracy:0.500,n:2},
-    {subject:"Person4",accuracy:0.500,n:2},
-    {subject:"Barbara",accuracy:1.000,n:2},
-    {subject:"Igor",accuracy:0.778,n:45},
-    {subject:"Syed",accuracy:0.500,n:24},
-    {subject:"Sadaf",accuracy:0.500,n:2},
-    {subject:"Jack",accuracy:0.820,n:61}
+    {subject:"Person1",accuracy:0.000,n:2},{subject:"Person2",accuracy:1.000,n:2},
+    {subject:"Person3",accuracy:0.500,n:2},{subject:"Person4",accuracy:0.500,n:2},
+    {subject:"Barbara",accuracy:1.000,n:2},{subject:"Igor",accuracy:0.750,n:16},
+    {subject:"Syed",accuracy:0.600,n:10},{subject:"Sadaf",accuracy:0.500,n:2},
+    {subject:"Subject9",accuracy:0.500,n:2},{subject:"Subject10",accuracy:0.000,n:2},
+    {subject:"Subject11",accuracy:0.000,n:2},{subject:"Subject12",accuracy:0.000,n:1},
+    {subject:"Subject13",accuracy:0.500,n:2},{subject:"Subject14",accuracy:0.500,n:2},
+    {subject:"Subject15",accuracy:0.000,n:2},{subject:"Subject16",accuracy:0.500,n:2},
+    {subject:"Subject17",accuracy:0.000,n:2},{subject:"Subject18",accuracy:0.500,n:2},
+    {subject:"Subject19",accuracy:0.500,n:2},{subject:"Subject20",accuracy:0.500,n:2},
+    {subject:"Subject21",accuracy:1.000,n:16},{subject:"Jack",accuracy:0.823,n:34}
   ],
-  cv_accuracy: 0.7394,
-  cv_method: "GroupKFold (leave-one-subject-out, 9 folds)"
+  cv_accuracy: 0.816,
+  cv_method: "GroupKFold (leave-one-subject-out, 22 folds, weighted)"
 };
 
 const SAMPLE_RATE = 100;
 const FEATURE_LABELS = {
   mean: 'Mean Sway', median: 'Median Sway', std: 'Std Dev',
   skewness: 'Skewness', kurtosis: 'Kurtosis', path_length: 'Path Length',
+  temporal_mean: 'Temporal Mean', temporal_median: 'Temporal Median',
+  temporal_std: 'Temporal Std', temporal_skewness: 'Temporal Skew',
+  temporal_kurtosis: 'Temporal Kurtosis', temporal_path_length: 'Temporal Path',
 };
 
 /* ==========================================================
@@ -866,7 +871,7 @@ function parseCSV(text) {
 
 /* ==========================================================
    FEATURE EXTRACTION (matches Python extract_features.py)
-   Features: mean, median, std, skewness, kurtosis, path_length
+   12 Features: 6 global + 6 temporal (std across 6 time windows)
    Computed from sway magnitude = sqrt(x² + y² + z²)
 ========================================================== */
 function extractFeatures(rows) {
@@ -893,7 +898,6 @@ function extractFeatures(rows) {
     }
   }
 
-  // Filter out NaN/Infinity values
   const validIdx = [];
   for (let i = 0; i < ax.length; i++) {
     if (isFinite(ax[i]) && isFinite(ay[i]) && isFinite(az[i])) validIdx.push(i);
@@ -908,20 +912,17 @@ function extractFeatures(rows) {
   const n = ax.length;
   if (n < 10) return null;
 
-  // Auto-detect sample rate
   let sampleRate = SAMPLE_RATE;
   if (rows[0].hasOwnProperty('seconds_elapsed') && n > 2) {
     const totalTime = rows[n-1]['seconds_elapsed'] - rows[0]['seconds_elapsed'];
     if (totalTime > 0) sampleRate = Math.round((n - 1) / totalTime);
   }
 
-  // Detect if gravity is present (raw accelerometer ≈ 9.81 magnitude)
   const rawMag = ax.map((x, i) => Math.sqrt(x*x + ay[i]*ay[i] + az[i]*az[i]));
   const rawMagMean = rawMag.reduce((s, v) => s + v, 0) / n;
 
   let mag;
   if (rawMagMean > 5) {
-    // Gravity present — subtract per-axis mean to isolate sway
     const meanFn = arr => arr.reduce((s, v) => s + v, 0) / arr.length;
     const mAx = meanFn(ax), mAy = meanFn(ay), mAz = meanFn(az);
     const dAx = ax.map(v => v - mAx);
@@ -929,67 +930,83 @@ function extractFeatures(rows) {
     const dAz = az.map(v => v - mAz);
     mag = dAx.map((x, i) => Math.sqrt(x*x + dAy[i]*dAy[i] + dAz[i]*dAz[i]));
   } else {
-    // Already linear acceleration (gravity-free)
     mag = rawMag;
   }
 
-  // Compute 6 features (matching scipy.stats for skewness/kurtosis)
-  const meanVal = mag.reduce((s, v) => s + v, 0) / n;
+  function computeWindowFeatures(m) {
+    const wn = m.length;
+    const wMean = m.reduce((s, v) => s + v, 0) / wn;
+    const wSorted = [...m].sort((a, b) => a - b);
+    const wMedian = wn % 2 === 0 ? (wSorted[wn/2 - 1] + wSorted[wn/2]) / 2 : wSorted[Math.floor(wn/2)];
+    const wVar = m.reduce((s, v) => s + (v - wMean)**2, 0) / wn;
+    const wStd = Math.sqrt(wVar);
+    const wM3 = m.reduce((s, v) => s + (v - wMean)**3, 0) / wn;
+    const wSkew = wStd > 0 ? wM3 / (wStd ** 3) : 0;
+    const wM4 = m.reduce((s, v) => s + (v - wMean)**4, 0) / wn;
+    const wKurt = wVar > 0 ? (wM4 / (wVar ** 2)) - 3 : 0;
+    let wPath = 0;
+    for (let i = 1; i < wn; i++) wPath += Math.abs(m[i] - m[i-1]);
+    const wPathNorm = wn > 1 ? wPath / (wn - 1) : 0;
+    return { mean: wMean, median: wMedian, std: wStd, skewness: wSkew, kurtosis: wKurt, path_length: wPathNorm };
+  }
 
-  const sorted = [...mag].sort((a, b) => a - b);
-  const medianVal = n % 2 === 0 ? (sorted[n/2 - 1] + sorted[n/2]) / 2 : sorted[Math.floor(n/2)];
+  const globalFeats = computeWindowFeatures(mag);
 
-  const variance = mag.reduce((s, v) => s + (v - meanVal)**2, 0) / n;
-  const stdVal = Math.sqrt(variance);
+  const NUM_WINDOWS = 6;
+  const windowSize = Math.floor(n / NUM_WINDOWS);
+  const windowResults = { mean: [], median: [], std: [], skewness: [], kurtosis: [], path_length: [] };
+  for (let w = 0; w < NUM_WINDOWS; w++) {
+    const wStart = w * windowSize;
+    const wEnd = wStart + windowSize;
+    const wMag = mag.slice(wStart, wEnd);
+    const wf = computeWindowFeatures(wMag);
+    for (const k of Object.keys(windowResults)) windowResults[k].push(wf[k]);
+  }
 
-  // Skewness: m3 / m2^(3/2) — matches scipy.stats.skew(bias=True)
-  const m3 = mag.reduce((s, v) => s + (v - meanVal)**3, 0) / n;
-  const skewnessVal = stdVal > 0 ? m3 / (stdVal ** 3) : 0;
-
-  // Kurtosis: m4 / m2^2 - 3 — matches scipy.stats.kurtosis(fisher=True, bias=True)
-  const m4 = mag.reduce((s, v) => s + (v - meanVal)**4, 0) / n;
-  const kurtosisVal = variance > 0 ? (m4 / (variance ** 2)) - 3 : 0;
-
-  // Path length: sum of |diff(mag)|
-  let pathLength = 0;
-  for (let i = 1; i < n; i++) {
-    pathLength += Math.abs(mag[i] - mag[i-1]);
+  const temporalFeats = {};
+  for (const k of Object.keys(windowResults)) {
+    const vals = windowResults[k];
+    const tMean = vals.reduce((s, v) => s + v, 0) / vals.length;
+    const tStd = Math.sqrt(vals.reduce((s, v) => s + (v - tMean)**2, 0) / vals.length);
+    temporalFeats['temporal_' + k] = tStd;
   }
 
   return {
-    features: {
-      mean: meanVal,
-      median: medianVal,
-      std: stdVal,
-      skewness: skewnessVal,
-      kurtosis: kurtosisVal,
-      path_length: pathLength,
-    },
+    features: { ...globalFeats, ...temporalFeats },
     sampleRate,
     accelData: { ax, ay, az },
   };
 }
 
 /* ==========================================================
-   PREDICTION (SVM linear decision function)
-   score = w · x_scaled + bias
-   If score > 0 → open (normal), else → closed (impaired)
+   PREDICTION (KNN k=7, distance-weighted)
+   Scale input, find 7 nearest training points, majority vote
 ========================================================== */
 function predict(features) {
-  const { weights, bias, scaler_mean, scaler_std, feature_names, classes } = MODEL;
-  let score = bias;
-  for (let i = 0; i < feature_names.length; i++) {
-    const scaled = (features[feature_names[i]] - scaler_mean[i]) / scaler_std[i];
-    score += weights[i] * scaled;
+  const { scaler_mean, scaler_std, feature_names, classes, k, training_features, training_labels } = MODEL;
+  const scaled = feature_names.map((f, i) => (features[f] - scaler_mean[i]) / scaler_std[i]);
+
+  const distances = training_features.map((tp, idx) => {
+    let dist = 0;
+    for (let i = 0; i < scaled.length; i++) dist += (scaled[i] - tp[i]) ** 2;
+    return { dist: Math.sqrt(dist), label: training_labels[idx] };
+  });
+  distances.sort((a, b) => a.dist - b.dist);
+  const neighbors = distances.slice(0, k);
+
+  let weightedVotes = [0, 0];
+  for (const nb of neighbors) {
+    const w = nb.dist > 0 ? 1 / nb.dist : 1e6;
+    weightedVotes[nb.label] += w;
   }
-  // Use sigmoid of score as confidence proxy
-  const prob = 1 / (1 + Math.exp(-score));
-  const label = score > 0 ? 'open' : 'closed';
+  const totalWeight = weightedVotes[0] + weightedVotes[1];
+  const probOpen = weightedVotes[1] / totalWeight;
+  const label = probOpen > 0.5 ? 'open' : 'closed';
   return {
     label,
-    confidence: Math.max(prob, 1 - prob),
-    probOpen: prob,
-    score,
+    confidence: Math.max(probOpen, 1 - probOpen),
+    probOpen,
+    score: probOpen - 0.5,
   };
 }
 
@@ -1072,17 +1089,25 @@ new Chart(document.getElementById('perSubjectChart').getContext('2d'), {
   }
 });
 
-// Feature importance (SVM weight magnitude)
-const absWeights = MODEL.weights.map(Math.abs);
-const sortedIdx = absWeights.map((v, i) => i).sort((a, b) => absWeights[a] - absWeights[b]);
+// Feature importance (mean difference between classes)
+const meanDiffs = MODEL.feature_names.map((f, i) => {
+  let sum0 = 0, n0 = 0, sum1 = 0, n1 = 0;
+  for (let j = 0; j < MODEL.training_labels.length; j++) {
+    if (MODEL.training_labels[j] === 0) { sum0 += MODEL.training_features[j][i]; n0++; }
+    else { sum1 += MODEL.training_features[j][i]; n1++; }
+  }
+  return (n0 > 0 && n1 > 0) ? (sum0/n0) - (sum1/n1) : 0;
+});
+const absDiffs = meanDiffs.map(Math.abs);
+const sortedIdx = absDiffs.map((v, i) => i).sort((a, b) => absDiffs[a] - absDiffs[b]);
 new Chart(document.getElementById('featureImportanceChart').getContext('2d'), {
   type: 'bar',
   data: {
-    labels: sortedIdx.map(i => FEATURE_LABELS[MODEL.feature_names[i]]),
+    labels: sortedIdx.map(i => FEATURE_LABELS[MODEL.feature_names[i]] || MODEL.feature_names[i]),
     datasets: [{
-      label: '|Weight|',
-      data: sortedIdx.map(i => +absWeights[i].toFixed(4)),
-      backgroundColor: sortedIdx.map(i => MODEL.weights[i] > 0 ? 'rgba(39,174,96,0.6)' : 'rgba(230,126,34,0.6)'),
+      label: 'Mean Diff',
+      data: sortedIdx.map(i => +absDiffs[i].toFixed(4)),
+      backgroundColor: sortedIdx.map(i => meanDiffs[i] > 0 ? 'rgba(230,126,34,0.6)' : 'rgba(39,174,96,0.6)'),
       borderRadius: 4,
     }]
   },
@@ -1091,7 +1116,7 @@ new Chart(document.getElementById('featureImportanceChart').getContext('2d'), {
     responsive: true,
     plugins: { legend: { display: false } },
     scales: {
-      x: { title: { display: true, text: '|Weight|  (green = higher → open, orange = higher → closed)', font: { family: 'DM Sans', size: 10 }, color: tickColor }, grid: { color: gridColor }, ticks: { color: tickColor } },
+      x: { title: { display: true, text: '|Mean Diff|  (green = higher in closed, orange = higher in open)', font: { family: 'DM Sans', size: 10 }, color: tickColor }, grid: { color: gridColor }, ticks: { color: tickColor } },
       y: { grid: { display: false }, ticks: { color: tickColor } }
     }
   }
@@ -1456,7 +1481,7 @@ function showPrediction(result, features, filename, sampleCount, accelData, dete
 
   let featHtml = '';
   MODEL.feature_names.forEach(f => {
-    featHtml += `<div class="pred-feat-row"><span class="pred-feat-label">${FEATURE_LABELS[f]}</span><span class="pred-feat-val">${features[f].toFixed(5)}</span></div>`;
+    featHtml += `<div class="pred-feat-row"><span class="pred-feat-label">${FEATURE_LABELS[f] || f}</span><span class="pred-feat-val">${features[f].toFixed(5)}</span></div>`;
   });
 
   el.innerHTML = `

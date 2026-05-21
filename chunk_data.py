@@ -19,6 +19,8 @@ REPORT_DIR = os.path.join(os.path.dirname(__file__), "reports")
 
 CHUNK_SECONDS = 30
 CHUNK_ROWS_MIN = 2500  # minimum rows to accept as a valid chunk (~25s)
+FIXED_ROWS = 3000      # exact row count per output chunk
+MAX_CHUNKS_PER_RECORDING = 3  # cap near-duplicate chunks from long recordings
 
 
 def estimate_sample_rate(df):
@@ -42,6 +44,25 @@ def chunk_file(df, sample_rate):
             break
         chunks.append(df.iloc[start:end].reset_index(drop=True))
     return chunks
+
+
+def enforce_fixed_length(df):
+    """Pad or truncate a chunk to exactly FIXED_ROWS rows."""
+    if len(df) >= FIXED_ROWS:
+        return df.iloc[:FIXED_ROWS].reset_index(drop=True)
+    if len(df) >= CHUNK_ROWS_MIN:
+        pad_count = FIXED_ROWS - len(df)
+        padding = pd.concat([df.iloc[[-1]]] * pad_count, ignore_index=True)
+        return pd.concat([df, padding], ignore_index=True)
+    return None
+
+
+def subsample_chunks(chunks):
+    """If too many chunks from one recording, take evenly spaced subset."""
+    if len(chunks) <= MAX_CHUNKS_PER_RECORDING:
+        return chunks
+    indices = np.linspace(0, len(chunks) - 1, MAX_CHUNKS_PER_RECORDING, dtype=int)
+    return [chunks[i] for i in indices]
 
 
 def main():
@@ -108,6 +129,15 @@ def main():
                     closed_chunks = chunk_file(df, rate)
                 else:
                     closed_chunks = [df]
+
+            # Subsample and enforce fixed length
+            open_chunks = subsample_chunks(open_chunks)
+            open_chunks = [enforce_fixed_length(c) for c in open_chunks]
+            open_chunks = [c for c in open_chunks if c is not None]
+
+            closed_chunks = subsample_chunks(closed_chunks)
+            closed_chunks = [enforce_fixed_length(c) for c in closed_chunks]
+            closed_chunks = [c for c in closed_chunks if c is not None]
 
             # Write chunks as separate sessions
             max_chunks = max(len(open_chunks), len(closed_chunks))

@@ -11,6 +11,8 @@ import numpy as np
 import pandas as pd
 from sklearn.svm import SVC
 from sklearn.linear_model import LogisticRegression
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 from sklearn.preprocessing import StandardScaler, LabelEncoder
 from sklearn.model_selection import GroupKFold
 from sklearn.metrics import (accuracy_score, precision_score, recall_score,
@@ -94,7 +96,9 @@ def main():
 
     df = pd.read_csv(FEATURES_PATH)
 
-    feature_cols = ["mean", "median", "std", "skewness", "kurtosis", "path_length"]
+    feature_cols = ["mean", "median", "std", "skewness", "kurtosis", "path_length",
+                    "temporal_mean", "temporal_median", "temporal_std",
+                    "temporal_skewness", "temporal_kurtosis", "temporal_path_length"]
     X = df[feature_cols].values
     le = LabelEncoder()
     y = le.fit_transform(df["label"])  # closed=0, open=1
@@ -113,6 +117,11 @@ def main():
         "SVM (RBF kernel)": (SVC, {"kernel": "rbf", "probability": True, "class_weight": "balanced"}),
         "SVM (Linear)": (SVC, {"kernel": "linear", "probability": True, "class_weight": "balanced"}),
         "Logistic Regression": (LogisticRegression, {"max_iter": 1000, "class_weight": "balanced"}),
+        "KNN (k=3)": (KNeighborsClassifier, {"n_neighbors": 3, "weights": "distance"}),
+        "KNN (k=5)": (KNeighborsClassifier, {"n_neighbors": 5, "weights": "distance"}),
+        "KNN (k=7)": (KNeighborsClassifier, {"n_neighbors": 7, "weights": "distance"}),
+        "Random Forest": (RandomForestClassifier, {"n_estimators": 200, "class_weight": "balanced", "random_state": 42, "max_depth": 6}),
+        "Gradient Boosting": (GradientBoostingClassifier, {"n_estimators": 150, "learning_rate": 0.1, "max_depth": 3, "random_state": 42}),
     }
 
     results = {}
