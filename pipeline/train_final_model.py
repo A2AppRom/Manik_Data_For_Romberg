@@ -46,7 +46,7 @@ def main():
     print(f"Features: {feature_cols}")
     print(f"Classes: {le.classes_.tolist()} → {list(range(len(le.classes_)))}")
     print(f"\nCross-validation accuracy (from model comparison): 81.6% weighted on meaningful folds")
-    print(f"Cross-validation method: GroupKFold LOSO, 22 folds")
+    print(f"Cross-validation method: GroupKFold LOSO, {len(df['subject_id'].unique())} folds")
 
     print(f"\nTraining set classification report:")
     print(classification_report(y, y_pred, target_names=le.classes_))
@@ -83,7 +83,7 @@ def main():
             "training_subjects": int(len(df["subject_id"].unique())),
             "cv_accuracy_weighted": 0.816,
             "cv_aggregate_accuracy": 0.676,
-            "cv_method": "GroupKFold (leave-one-subject-out, 22 folds)",
+            "cv_method": f"GroupKFold (leave-one-subject-out, {len(df['subject_id'].unique())} folds)",
             "n_features": len(feature_cols),
         }
     }

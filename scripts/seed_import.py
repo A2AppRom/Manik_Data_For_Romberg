@@ -22,7 +22,11 @@ from supabase import create_client
 SUPABASE_URL = os.environ['SB_URL']
 SUPABASE_SERVICE_ROLE_KEY = os.environ['SB_SERVICE_ROLE_KEY']
 
-FEATURE_COLUMNS = ['mean', 'median', 'std', 'skewness', 'kurtosis', 'path_length']
+FEATURE_COLUMNS = [
+    'mean', 'median', 'std', 'skewness', 'kurtosis', 'path_length',
+    'temporal_mean', 'temporal_median', 'temporal_std',
+    'temporal_skewness', 'temporal_kurtosis', 'temporal_path_length',
+]
 
 
 def main():

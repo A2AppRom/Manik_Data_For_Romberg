@@ -62,7 +62,7 @@ The original system was built with a smaller dataset and a simpler pipeline:
 | **Browser inference** | Dot product with weight vector + bias | Full KNN: Euclidean distance to 111 training points |
 | **Data directories** | `romberg_data/`, `romberg_data_cleaned/`, `romberg_data_final/` at root | `data/raw/`, `data/cleaned/`, `data/final/` |
 | **Scripts** | All at repo root | Organized in `pipeline/` |
-| **Subject 08 (Sophia)** | Included (10 fake sessions from 1 recording) | Dropped |
+| **Subject 08 (Sophia)** | Included (10 corrupted sessions from 1 recording) | Dropped |
 
 ### What Changed and Why
 
@@ -93,7 +93,7 @@ All files were at the root level in the previous version. The repository was reo
 **7. Reduced sample count (142 → 111)**
 
 Despite adding 13 new subjects, the total sample count decreased from 142 to 111. This happened because:
-- Subject 08 (Sophia) was dropped: removed 20 samples (10 fake open + 10 fake closed)
+- Subject 08 (Sophia) was dropped: removed 20 samples (10 corrupted open + 10 corrupted closed)
 - The sort-order fix changed which files mapped to which subjects, correcting session-to-subject assignments
 - The chunking pipeline now caps long recordings to 3 chunks per recording (`MAX_CHUNKS_PER_RECORDING = 3`), preventing any single subject from dominating the dataset
 - 15 of the 22 subjects have only 1 session each (2 recordings: 1 open + 1 closed), which is typical for the new subjects who each performed one 30-second trial
@@ -218,6 +218,24 @@ Compares 8 model types using GroupKFold leave-one-subject-out (LOSO) cross-valid
 **Output:** `model/romberg_model_weights.json`
 
 Trains KNN (k=7, distance-weighted) on all 111 samples and exports the full scaled training set, scaler parameters, and metadata for browser inference.
+
+### Step 7: Retrain from Supabase (`pipeline/retrain_from_supabase.py`)
+
+**Input:** `results/features_dataset.csv` + labeled samples from Supabase
+**Output:** Updated `model/romberg_model_weights.json` + updated `ui/index.html`
+
+When users upload CSVs through the website and provide a ground-truth label, the prediction and raw CSV are stored in Supabase. This script pulls those labeled samples, combines them with the local training data, and retrains the model:
+
+1. Load the existing 111 local training samples from `results/features_dataset.csv`
+2. Fetch all labeled samples from Supabase (where `label IS NOT NULL`)
+3. For samples missing temporal features (uploaded before temporal features were added), download the raw CSV from Supabase Storage and re-extract all 12 features
+4. Combine the local and Supabase datasets
+5. Retrain KNN (k=7, distance-weighted) on the combined data
+6. Run LOSO cross-validation and report accuracy
+7. Export updated model weights to `model/romberg_model_weights.json`
+8. Update the embedded MODEL object in `ui/index.html`
+
+This creates a feedback loop: as more users upload labeled recordings through the website, the model can be periodically retrained to incorporate the new data.
 
 ---
 
@@ -424,6 +442,7 @@ KNN exports the full training set: 111 points x 12 features = 1,332 floating-poi
 Manik_Data_For_Romberg/
 ├── README.md
 ├── .gitignore
+├── index.html                   # Root redirect → ui/index.html (for GitHub Pages)
 │
 ├── ui/                          # Frontend (served as static site)
 │   ├── index.html               # Main app: prediction, charts, animation
@@ -435,7 +454,8 @@ Manik_Data_For_Romberg/
 │   ├── chunk_data.py            # 3. Split into 30-second segments → data/final/
 │   ├── extract_features.py      # 4. Compute 12 features per chunk → results/
 │   ├── train_model_comparison.py # 5. Compare 8 models with LOSO CV → results/
-│   └── train_final_model.py     # 6. Train KNN (k=7) on all data → model/
+│   ├── train_final_model.py     # 6. Train KNN (k=7) on all data → model/
+│   └── retrain_from_supabase.py # 7. Retrain using local + Supabase labeled data
 │
 ├── model/                       # Trained model output
 │   └── romberg_model_weights.json  # KNN training data + scaler params (for browser)
@@ -497,6 +517,9 @@ python3 -m http.server 8000 --directory ui
 
 ```bash
 pip install pandas numpy scipy scikit-learn
+
+# Additional dependency for Supabase retraining (Step 7 only)
+pip install supabase
 ```
 
 ### Run Each Step
@@ -519,6 +542,11 @@ python3 pipeline/train_model_comparison.py
 
 # Step 6: Train final model and export
 python3 pipeline/train_final_model.py
+
+# Step 7: Retrain with Supabase data (requires credentials)
+export SB_URL="https://xmxyschvrqcqhqznjdgu.supabase.co"
+export SB_SERVICE_ROLE_KEY="your-service-role-key"
+python3 pipeline/retrain_from_supabase.py
 ```
 
 ### Run Tests
@@ -541,7 +569,8 @@ bash tests/test_pipeline.sh    # 5 tests: full pipeline (requires source data)
 | Frontend | Single-file HTML/CSS/JS (`ui/index.html`), Chart.js for visualizations |
 | Browser inference | Vanilla JavaScript — Euclidean distance, distance-weighted voting |
 | Animation | HTML5 Canvas — stick figure driven by uploaded accelerometer data |
-| Database | Supabase (PostgreSQL + file storage) for prediction history |
+| Database | Supabase (PostgreSQL + file storage) for prediction history and retraining data |
+| Retraining | `pipeline/retrain_from_supabase.py` — pulls labeled data from Supabase, retrains KNN, updates model + HTML |
 | Hosting | GitHub Pages |
 
 ---

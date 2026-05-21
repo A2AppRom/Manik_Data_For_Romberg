@@ -46,11 +46,11 @@ fi
 echo "Test 3: Running chunk_data.py..."
 python3 pipeline/chunk_data.py > /dev/null 2>&1
 CHUNK_COUNT=$(find data/final -name "*.csv" -not -name "manifest.csv" | wc -l | tr -d ' ')
-if [ "$CHUNK_COUNT" -gt 200 ]; then
+if [ "$CHUNK_COUNT" -gt 100 ]; then
     echo "  PASS - $CHUNK_COUNT chunk files created in data/final/"
     PASS=$((PASS+1))
 else
-    echo "  FAIL - only $CHUNK_COUNT chunk files (expected >200)"
+    echo "  FAIL - only $CHUNK_COUNT chunk files (expected >100)"
     FAIL=$((FAIL+1))
 fi
 
@@ -71,13 +71,14 @@ else
     FAIL=$((FAIL+1))
 fi
 
-# Test 5: Verify no subject_08 (Sophia's corrupted data)
-echo "Test 5: Verifying Sophia (subject_08) is excluded..."
-if [ ! -d "data/final/subject_08" ]; then
-    echo "  PASS - subject_08 correctly excluded from final data"
+# Test 5: Verify correct subject count (22 subjects after Sophia exclusion + renumbering)
+echo "Test 5: Verifying subject count..."
+SUBJ_COUNT=$(cut -d',' -f1 results/features_dataset.csv | tail -n +2 | sort -u | wc -l | tr -d ' ')
+if [ "$SUBJ_COUNT" -eq 22 ]; then
+    echo "  PASS - 22 unique subjects in features_dataset.csv"
     PASS=$((PASS+1))
 else
-    echo "  FAIL - subject_08 still exists in data/final/"
+    echo "  FAIL - expected 22 subjects, got $SUBJ_COUNT"
     FAIL=$((FAIL+1))
 fi
 
