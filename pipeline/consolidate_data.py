@@ -22,7 +22,8 @@ import os
 import pandas as pd
 
 BASE = "/Users/taswarmahbub"
-OUTPUT = os.path.join(BASE, "Manik_Data_For_Romberg", "romberg_data")
+PROJECT_ROOT = os.path.dirname(os.path.dirname(__file__))
+OUTPUT = os.path.join(PROJECT_ROOT, "data", "raw")
 
 os.makedirs(OUTPUT, exist_ok=True)
 
@@ -225,13 +226,13 @@ existing_syed_sessions = [r for r in manifest_rows if r["subject_id"] == "subjec
 next_sess = max(r["session_id"] for r in existing_syed_sessions) + 1 if existing_syed_sessions else 0
 
 dst = make_session_dir(syed_subject, next_sess)
-src = os.path.join(BASE, "Manik_Data_For_Romberg", "old_files", "balance_data", "eyes_open",
+src = os.path.join(BASE, "Manik_Data_For_Romberg", "_archive", "balance_data", "eyes_open",
                    "Accelerometer_Syed_Open.csv")
 rows = copy_csv(src, os.path.join(dst, "eyes_open.csv"))
 add_to_manifest(syed_subject, "Syed", next_sess, "open", "Manik_balance_data", src, rows)
 print(f"  subject_{syed_subject:02d}/session_{next_sess} eyes_open (long ~5min): {rows} rows")
 
-src = os.path.join(BASE, "Manik_Data_For_Romberg", "old_files", "balance_data", "eyes_closed",
+src = os.path.join(BASE, "Manik_Data_For_Romberg", "_archive", "balance_data", "eyes_closed",
                    "Accelerometer_Syed_Closed.csv")
 rows = copy_csv(src, os.path.join(dst, "eyes_closed.csv"))
 add_to_manifest(syed_subject, "Syed", next_sess, "closed", "Manik_balance_data", src, rows)

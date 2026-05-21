@@ -13,9 +13,10 @@ import os
 import numpy as np
 import pandas as pd
 
-INPUT_DIR = os.path.join(os.path.dirname(__file__), "romberg_data")
-OUTPUT_DIR = os.path.join(os.path.dirname(__file__), "romberg_data_cleaned")
-REPORT_DIR = os.path.join(os.path.dirname(__file__), "reports")
+PROJECT_ROOT = os.path.dirname(os.path.dirname(__file__))
+INPUT_DIR = os.path.join(PROJECT_ROOT, "data", "raw")
+OUTPUT_DIR = os.path.join(PROJECT_ROOT, "data", "cleaned")
+REPORT_DIR = os.path.join(PROJECT_ROOT, "reports")
 
 SAMPLE_RATE = 100  # approximate Hz
 SAFETY_BUFFER_S = 1.5  # trim this many seconds from start/end unconditionally

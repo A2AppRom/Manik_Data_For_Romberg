@@ -21,8 +21,9 @@ from sklearn.metrics import (accuracy_score, precision_score, recall_score,
 import json
 import os
 
-FEATURES_PATH = os.path.join(os.path.dirname(__file__), "features_dataset.csv")
-OUTPUT_DIR = os.path.dirname(__file__)
+PROJECT_ROOT = os.path.dirname(os.path.dirname(__file__))
+FEATURES_PATH = os.path.join(PROJECT_ROOT, "results", "features_dataset.csv")
+OUTPUT_DIR = os.path.join(PROJECT_ROOT, "results")
 
 
 def run_grouped_cv(model_class, model_params, X, y, groups, model_name):

@@ -14,8 +14,9 @@ from sklearn.metrics import classification_report, confusion_matrix
 import json
 import os
 
-FEATURES_PATH = os.path.join(os.path.dirname(__file__), "features_dataset.csv")
-OUTPUT_DIR = os.path.dirname(__file__)
+PROJECT_ROOT = os.path.dirname(os.path.dirname(__file__))
+FEATURES_PATH = os.path.join(PROJECT_ROOT, "results", "features_dataset.csv")
+OUTPUT_DIR = os.path.join(PROJECT_ROOT, "model")
 
 
 def main():

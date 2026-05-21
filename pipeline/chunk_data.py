@@ -13,9 +13,10 @@ import os
 import pandas as pd
 import numpy as np
 
-INPUT_DIR = os.path.join(os.path.dirname(__file__), "romberg_data_cleaned")
-OUTPUT_DIR = os.path.join(os.path.dirname(__file__), "romberg_data_final")
-REPORT_DIR = os.path.join(os.path.dirname(__file__), "reports")
+PROJECT_ROOT = os.path.dirname(os.path.dirname(__file__))
+INPUT_DIR = os.path.join(PROJECT_ROOT, "data", "cleaned")
+OUTPUT_DIR = os.path.join(PROJECT_ROOT, "data", "final")
+REPORT_DIR = os.path.join(PROJECT_ROOT, "reports")
 
 CHUNK_SECONDS = 30
 CHUNK_ROWS_MIN = 2500  # minimum rows to accept as a valid chunk (~25s)

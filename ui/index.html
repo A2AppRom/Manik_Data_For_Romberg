@@ -644,10 +644,10 @@
       <table class="metrics-table">
         <thead><tr><th>Script</th><th>Purpose</th></tr></thead>
         <tbody>
-          <tr><td style="font-weight:600">consolidate_data.py</td><td>Merge recordings from 5 repos into unified structure</td></tr>
-          <tr><td style="font-weight:600">clean_data.py</td><td>Trim phone-handling artifacts from start/end</td></tr>
-          <tr><td style="font-weight:600">chunk_data.py</td><td>Split longer recordings into 30-second segments</td></tr>
-          <tr><td style="font-weight:600">extract_features.py</td><td>Compute 12 features per chunk &#8594; features_dataset.csv</td></tr>
+          <tr><td style="font-weight:600">pipeline/consolidate_data.py</td><td>Merge recordings from 5 repos into unified structure</td></tr>
+          <tr><td style="font-weight:600">pipeline/clean_data.py</td><td>Trim phone-handling artifacts from start/end</td></tr>
+          <tr><td style="font-weight:600">pipeline/chunk_data.py</td><td>Split longer recordings into 30-second segments</td></tr>
+          <tr><td style="font-weight:600">pipeline/extract_features.py</td><td>Compute 12 features per chunk &#8594; results/features_dataset.csv</td></tr>
         </tbody>
       </table>
     </div>
@@ -657,8 +657,8 @@
       <table class="metrics-table">
         <thead><tr><th>Script</th><th>Purpose</th></tr></thead>
         <tbody>
-          <tr><td style="font-weight:600">train_model_comparison.py</td><td>Compare SVM, LogReg, KNN, RF, GB with GroupKFold LOSO</td></tr>
-          <tr><td style="font-weight:600">train_final_model.py</td><td>Train KNN (k=7) on all 111 samples, export training data</td></tr>
+          <tr><td style="font-weight:600">pipeline/train_model_comparison.py</td><td>Compare SVM, LogReg, KNN, RF, GB with GroupKFold LOSO</td></tr>
+          <tr><td style="font-weight:600">pipeline/train_final_model.py</td><td>Train KNN (k=7) on all 111 samples, export to model/</td></tr>
         </tbody>
       </table>
     </div>

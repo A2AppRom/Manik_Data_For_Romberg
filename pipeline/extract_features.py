@@ -23,8 +23,9 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 
-INPUT_DIR = os.path.join(os.path.dirname(__file__), "romberg_data_final")
-OUTPUT_DIR = os.path.dirname(__file__)
+PROJECT_ROOT = os.path.dirname(os.path.dirname(__file__))
+INPUT_DIR = os.path.join(PROJECT_ROOT, "data", "final")
+OUTPUT_DIR = os.path.join(PROJECT_ROOT, "results")
 
 NUM_WINDOWS = 6
 
